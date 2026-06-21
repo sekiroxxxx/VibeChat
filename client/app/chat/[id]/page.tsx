@@ -82,7 +82,11 @@ export default function ChatPage() {
   const [sseError, setSseError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
   const [reportDone, setReportDone] = useState(false);
+  const [typingUser, setTypingUser] = useState<string | null>(null);
+  const [connBanner, setConnBanner] = useState<string | null>(null);
   const submittingRef = useRef(false);
+  const typingSendRef = useRef(0);
+  const typingClearRef = useRef<ReturnType<typeof setTimeout>>();
 
   const chat = useChat([]);
   const sse = useSSE();
@@ -139,13 +143,15 @@ export default function ChatPage() {
     sse.connect(sessionId, {
       onMessage: (msg) => {
         chat.addMessage(msg);
-        // 对方消息 + 页面不可见 → 浏览器通知
         if (msg.sender_anonymous_id !== myId && msg.type === "user") {
           notif.notify(otherName || "聊天伙伴", msg.content.slice(0, 80));
         }
       },
       onStatus: (data) => {
-        if (data.status === "closing") {
+        // F5 — 按 reason 区分 3 种断开
+        if (data.reason === "partner_disconnected") {
+          setConnBanner("对方网络不稳定，连接已断开");
+        } else if (data.status === "closing") {
           setStatusNote("对方已离开，当前会话即将关闭");
         } else if (data.status === "closed") {
           router.replace("/closed");
@@ -153,6 +159,13 @@ export default function ChatPage() {
       },
       onError: (msg, retryable) => {
         setSseError(retryable ? `${msg}（自动重连中…）` : msg);
+      },
+      /* F4 — 对方正在输入 */
+      onTyping: (data) => {
+        if (data.sender_anonymous_id === myId) return;
+        setTypingUser(data.sender_anonymous_id);
+        clearTimeout(typingClearRef.current);
+        typingClearRef.current = setTimeout(() => setTypingUser(null), 3000);
       },
     });
 
@@ -176,6 +189,26 @@ export default function ChatPage() {
     });
     setInputText("");
   }, [inputText, chat, sessionId]);
+
+  // F5 — 连接状态 → 断网/重连 banner
+  useEffect(() => {
+    if (sse.connectionState === "reconnecting") {
+      setConnBanner("连接已断开，正在重连…");
+    } else if (sse.connectionState === "connected") {
+      setConnBanner(null);
+      setSseError(null);
+    } else if (sse.connectionState === "disconnected" && !statusNote) {
+      setConnBanner("连接已断开，请检查网络");
+    }
+  }, [sse.connectionState, statusNote]);
+
+  // F4 — 输入时节流发送 typing 事件（2s 间隔）
+  const handleTyping = useCallback(() => {
+    const now = Date.now();
+    if (now - typingSendRef.current < 2000) return;
+    typingSendRef.current = now;
+    api.sendTyping(sessionId).catch(() => { /* 忽略 */ });
+  }, [sessionId]);
 
   const handleLeave = useCallback(async () => {
     try {
@@ -261,10 +294,18 @@ export default function ChatPage() {
         </span>
       </div>
 
-      {/* 状态提示 */}
-      {(statusNote || sseError) && (
-        <div style={statusNote ? st.statusBanner : st.errorBanner}>
-          {statusNote || sseError}
+      {/* 状态提示 — F5 按类型分颜色 */}
+      {(statusNote || sseError || connBanner) && (
+        <div
+          style={
+            connBanner
+              ? st.connBanner
+              : statusNote
+              ? st.statusBanner
+              : st.errorBanner
+          }
+        >
+          {connBanner || statusNote || sseError}
         </div>
       )}
 
@@ -281,6 +322,17 @@ export default function ChatPage() {
             />
           </React.Fragment>
         ))}
+        {/* F4 — 对方正在输入指示 */}
+        {typingUser && (
+          <div style={st.typingRow}>
+            <span style={st.typingDots}>
+              <span style={{ ...st.typingDot, animationDelay: "0s" }} />
+              <span style={{ ...st.typingDot, animationDelay: "0.2s" }} />
+              <span style={{ ...st.typingDot, animationDelay: "0.4s" }} />
+            </span>
+            <span style={st.typingText}>对方正在输入…</span>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -289,7 +341,7 @@ export default function ChatPage() {
         <textarea
           style={st.textInput}
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={(e) => { setInputText(e.target.value); handleTyping(); }}
           placeholder="输入消息…"
           rows={1}
           maxLength={1000}
@@ -464,5 +516,36 @@ const st: Record<string, React.CSSProperties> = {
     fontSize: "12px",
     color: "#bbb",
     whiteSpace: "nowrap",
+  },
+  /* F5 — 连接断开 banner（蓝色，区别于警告/错误） */
+  connBanner: {
+    padding: "8px 16px",
+    background: "#e8f4fd",
+    color: "#4a6fa5",
+    fontSize: "13px",
+    textAlign: "center",
+  },
+  /* F4 — 输入指示 */
+  typingRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "4px 0",
+  },
+  typingDots: {
+    display: "flex",
+    gap: "4px",
+  },
+  typingDot: {
+    width: "6px",
+    height: "6px",
+    borderRadius: "50%",
+    background: "#bbb",
+    animation: "pulse 1.2s ease-in-out infinite",
+  },
+  typingText: {
+    fontSize: "12px",
+    color: "#bbb",
+    fontStyle: "italic",
   },
 };
