@@ -7,6 +7,7 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorBanner } from "@/components/shared/ErrorBanner";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
+import { shouldMock, MOCK_ME } from "@/lib/mock-data";
 
 interface HistoryItem {
   primary_emotion: string;
@@ -18,6 +19,7 @@ interface HistoryItem {
 
 export default function HistoryPage() {
   const [items, setItems] = useState<HistoryItem[]>([]);
+  const [isMock, setIsMock] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -25,6 +27,14 @@ export default function HistoryPage() {
   const load = () => {
     setIsLoading(true);
     setError(null);
+
+    if (shouldMock()) {
+      setIsMock(true);
+      setItems((MOCK_ME.emotion_history as unknown as HistoryItem[]) || []);
+      setIsLoading(false);
+      return;
+    }
+
     api.getMe()
       .then((data) => {
         setItems((data.emotion_history as unknown as HistoryItem[]) || []);
@@ -43,6 +53,7 @@ export default function HistoryPage() {
             ← 返回
           </button>
           <h1 style={st.title}>📋 历史报告</h1>
+          {isMock && <span style={st.mockBadge}>Mock</span>}
         </div>
 
         {isLoading && <LoadingSpinner text="加载中…" />}
@@ -134,4 +145,13 @@ const st: Record<string, React.CSSProperties> = {
     textOverflow: "ellipsis",
   },
   itemDate: { fontSize: "12px", color: "#bbb", flexShrink: 0 },
+  mockBadge: {
+    fontSize: "11px",
+    fontWeight: 600,
+    color: "#fff",
+    background: "#f0a030",
+    padding: "2px 8px",
+    borderRadius: "4px",
+    marginLeft: "8px",
+  },
 };

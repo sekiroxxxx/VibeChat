@@ -7,6 +7,7 @@ import { ChatBubble, DateSeparator, fmtTime } from "@/components/chat/ChatBubble
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
+import { shouldMock, MOCK_SESSION } from "@/lib/mock-data";
 import type { ChatSession, Message } from "@shared/types";
 
 export default function ChatHistoryPage() {
@@ -14,49 +15,49 @@ export default function ChatHistoryPage() {
   const router = useRouter();
   const [session, setSession] = useState<ChatSession | null>(null);
   const [otherName, setOtherName] = useState("");
-  const [otherEmotion, setOtherEmotion] = useState("");
   const [headerEmoji, setHeaderEmoji] = useState("💭");
   const [chatTime, setChatTime] = useState("");
+  const [isMock, setIsMock] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myId, setMyId] = useState("");
 
   useEffect(() => {
-    // 优先从 sessionStore 获取自己的 user_id
     const raw = sessionStorage.getItem("vb_session");
     let uid = "";
     if (raw) {
       try {
         const sess: ChatSession = JSON.parse(raw);
-        if (sess.session_id === id) {
-          uid = sess.user_a.id || "";
-        }
+        if (sess.session_id === id) uid = sess.user_a.id || "";
       } catch { /* ignore */ }
     }
     setMyId(uid);
 
-    // 调 GET /api/sessions/:id 获取完整会话
+    if (shouldMock()) {
+      setIsMock(true);
+      const s = MOCK_SESSION;
+      setSession(s);
+      const other = s.user_b;
+      setOtherName(other.anonymous_name);
+      const ec = EMOTION_COLORS[other.emotion.primary_emotion] ?? DEFAULT_EMOTION_COLOR;
+      setHeaderEmoji(ec.emoji);
+      setChatTime(`${new Date(s.created_at).toLocaleDateString()} ${fmtTime(s.created_at)}`);
+      setIsLoading(false);
+      return;
+    }
+
     api.get<{ session: ChatSession }>(`/api/sessions/${id}`)
       .then((data) => {
         const s = data.session;
         setSession(s);
-
-        // 对方信息
         const isA = s.user_a.id === uid;
         const other = isA ? s.user_b : s.user_a;
         setOtherName(other.anonymous_name);
-        setOtherEmotion(other.emotion.primary_emotion);
-
         const ec = EMOTION_COLORS[other.emotion.primary_emotion] ?? DEFAULT_EMOTION_COLOR;
         setHeaderEmoji(ec.emoji);
-
-        setChatTime(
-          `${new Date(s.created_at).toLocaleDateString()} ${fmtTime(s.created_at)}`
-        );
+        setChatTime(`${new Date(s.created_at).toLocaleDateString()} ${fmtTime(s.created_at)}`);
       })
-      .catch((e) => {
-        setError(e instanceof Error ? e.message : "加载失败");
-      })
+      .catch((e) => setError(e instanceof Error ? e.message : "加载失败"))
       .finally(() => setIsLoading(false));
   }, [id]);
 
@@ -121,6 +122,7 @@ export default function ChatHistoryPage() {
             <p style={st.chatTime}>{chatTime}</p>
           </div>
         </div>
+        {isMock && <span style={st.mockBadge}>Mock</span>}
       </div>
 
       {/* 消息列表 — 只读回放 */}
@@ -201,5 +203,14 @@ const st: Record<string, React.CSSProperties> = {
     fontSize: "14px",
     color: "#7c6ff7",
     textDecoration: "none",
+  },
+  mockBadge: {
+    fontSize: "11px",
+    fontWeight: 600,
+    color: "#fff",
+    background: "#f0a030",
+    padding: "2px 8px",
+    borderRadius: "4px",
+    flexShrink: 0,
   },
 };

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { sessionStore } from "@/lib/session-store";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { shouldMock, MOCK_ANALYSIS } from "@/lib/mock-data";
 import type { EmotionAnalysis } from "@shared/types";
 
 type MatchMode = "auto" | "guided" | "free";
@@ -28,7 +29,12 @@ export default function ResultPage() {
 
   useEffect(() => {
     const a = sessionStore.getAnalysis();
-    if (!a) { router.replace("/"); return; }
+    // mock 模式：无 sessionStore 时注入 MOCK_ANALYSIS
+    if (!a) {
+      if (shouldMock()) { setAnalysis(MOCK_ANALYSIS); return; }
+      router.replace("/");
+      return;
+    }
     setAnalysis(a);
   }, [router]);
 
