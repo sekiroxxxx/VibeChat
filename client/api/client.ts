@@ -84,7 +84,12 @@ export const api = {
     request<void>(`/api/sessions/${sessionId}/typing`, { method: "POST" }),
 
   summary: (sessionId: string, feeling: string) =>
-    request<{ summary: string; emotion_shift: { before: string; after_hint: string } }>(
+    request<{
+      summary: string;
+      emotion_shift: { before: string; after_hint: string };
+      recap?: Record<string, unknown>;
+      blocks?: { emotion_start: string; conversation: string; emotion_change: string };
+    }>(
       `/api/sessions/${sessionId}/summary`,
       { method: "POST", body: JSON.stringify({ feeling }) },
     ),

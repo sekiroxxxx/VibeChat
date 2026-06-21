@@ -6,6 +6,13 @@
  */
 
 import { MOCK_ANALYSIS, MOCK_SESSION, MOCK_ME } from "./mock-data";
+import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
+
+const EMOTION_COLORS_MAP: Record<string, string> = {};
+for (const [k, v] of Object.entries(EMOTION_COLORS)) {
+  EMOTION_COLORS_MAP[k] = v.emoji;
+}
+const _ = DEFAULT_EMOTION_COLOR;
 
 /** 路由 mock 请求，返回 [data, ok] 或 null（未匹配） */
 export async function mockRoute(
@@ -86,11 +93,26 @@ export async function mockRoute(
   /* ── 总结 ── */
   const summaryMatch = p.match(/^\/api\/sessions\/([^/]+)\/summary$/);
   if (summaryMatch && method === "POST") {
+    const session = MOCK_SESSION;
     return [{
-      summary: "这次对话让你从疲惫中找到了平静。对方温和的态度让你感受到了被理解的温暖。聊天后，你的情绪从'疲惫'转变为更轻松的状态。",
+      summary: "这次对话让你从孤独中找到了温暖的陪伴。深夜的聊天里，你们交换了安静的理解——不是要解决什么，而是有人愿意在那个时候陪着你。",
       emotion_shift: {
-        before: MOCK_ANALYSIS.primary_emotion,
-        after_hint: "平静中带着感激，身体虽然还是累的，但心里轻松了许多",
+        before: session.user_a.emotion.primary_emotion,
+        after_hint: "释然中带着平静，心里好像卸下了点什么",
+      },
+      recap: {
+        entering_emotion: session.user_a.emotion.primary_emotion,
+        entering_emoji: EMOTION_COLORS_MAP[session.user_a.emotion.primary_emotion] || "💭",
+        partner_name: session.user_b.anonymous_name,
+        partner_emotion: session.user_b.emotion.primary_emotion,
+        partner_emoji: EMOTION_COLORS_MAP[session.user_b.emotion.primary_emotion] || "💭",
+        message_count: session.messages.filter((m) => m.type === "user").length,
+        duration: "8 分钟",
+      },
+      blocks: {
+        emotion_start: `你进入对话时感到「${session.user_a.emotion.primary_emotion}」——${session.user_a.emotion.interpretation}`,
+        conversation: `与「${session.user_b.anonymous_name}」交换了 ${session.messages.filter((m) => m.type === "user").length} 条消息，持续约 8 分钟。你们在相似的深夜里寻找一种安静的陪伴。`,
+        emotion_change: `从「${session.user_a.emotion.primary_emotion}」到「释然」——对话帮助你释放了一些压在心里的重量。`,
       },
     }, true];
   }
