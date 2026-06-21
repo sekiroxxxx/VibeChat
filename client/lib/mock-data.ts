@@ -223,14 +223,7 @@ export const MOCK_ME = {
   ],
 };
 
-/* ── 判断是否使用 mock ── */
-export function shouldMock(): boolean {
-  if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).has("mock");
-}
-
-/** 获取当前页面的 mock 参数值 */
-export function mockParam(key: string): string | null {
-  if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get(key);
-}
+/* ── 注意 ──
+ * mock 模式由 mock-mode.ts + mock-api.ts 驱动
+ * 页面无需 import 此文件——API 客户端在 mock 模式下自动返回此处的数据
+ */

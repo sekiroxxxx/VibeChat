@@ -7,7 +7,6 @@ import { ChatBubble, DateSeparator, fmtTime } from "@/components/chat/ChatBubble
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
-import { shouldMock, MOCK_SESSION } from "@/lib/mock-data";
 import type { ChatSession, Message } from "@shared/types";
 
 export default function ChatHistoryPage() {
@@ -17,7 +16,6 @@ export default function ChatHistoryPage() {
   const [otherName, setOtherName] = useState("");
   const [headerEmoji, setHeaderEmoji] = useState("💭");
   const [chatTime, setChatTime] = useState("");
-  const [isMock, setIsMock] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myId, setMyId] = useState("");
@@ -32,19 +30,6 @@ export default function ChatHistoryPage() {
       } catch { /* ignore */ }
     }
     setMyId(uid);
-
-    if (shouldMock()) {
-      setIsMock(true);
-      const s = MOCK_SESSION;
-      setSession(s);
-      const other = s.user_b;
-      setOtherName(other.anonymous_name);
-      const ec = EMOTION_COLORS[other.emotion.primary_emotion] ?? DEFAULT_EMOTION_COLOR;
-      setHeaderEmoji(ec.emoji);
-      setChatTime(`${new Date(s.created_at).toLocaleDateString()} ${fmtTime(s.created_at)}`);
-      setIsLoading(false);
-      return;
-    }
 
     api.get<{ session: ChatSession }>(`/api/sessions/${id}`)
       .then((data) => {
@@ -122,7 +107,6 @@ export default function ChatHistoryPage() {
             <p style={st.chatTime}>{chatTime}</p>
           </div>
         </div>
-        {isMock && <span style={st.mockBadge}>Mock</span>}
       </div>
 
       {/* 消息列表 — 只读回放 */}

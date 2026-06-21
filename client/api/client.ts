@@ -1,10 +1,29 @@
-/** HTTP 客户端 — 只调 server HTTP 端点，不 import server */
+/** HTTP 客户端 — mock 模式下不调后端，直接从 mock-api 返回 */
+import { isMockMode } from "@/lib/mock-mode";
+import { mockRoute } from "@/lib/mock-api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  // ── Mock 模式：拦截所有 HTTP 请求 ──
+  if (isMockMode()) {
+    let body: Record<string, unknown> | undefined;
+    if (options?.body) {
+      try { body = JSON.parse(options.body as string); } catch { /* ignore */ }
+    }
+    const result = await mockRoute(path, options?.method || "GET", body);
+    if (result) {
+      const [data, ok] = result;
+      if (!ok) throw new Error((data.error as string) || "Mock error");
+      return data as T;
+    }
+    // 未匹配的 mock 路由 → 返回空成功（如 typing 事件等不重要的调用）
+    console.warn(`[mock] 未匹配: ${options?.method || "GET"} ${path}`);
+    return {} as T;
+  }
+
   const res = await fetch(`${BASE}${path}`, {
-    credentials: "include",  // cookie 自动带
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     ...options,
   });

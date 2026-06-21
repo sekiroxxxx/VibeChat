@@ -7,7 +7,6 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { ErrorBanner } from "@/components/shared/ErrorBanner";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
-import { shouldMock, MOCK_ME } from "@/lib/mock-data";
 
 interface SessionItem {
   session_id: string;
@@ -20,7 +19,6 @@ interface SessionItem {
 
 export default function ChatHistoryPage() {
   const [items, setItems] = useState<SessionItem[]>([]);
-  const [isMock, setIsMock] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -28,14 +26,6 @@ export default function ChatHistoryPage() {
   const load = () => {
     setIsLoading(true);
     setError(null);
-
-    if (shouldMock()) {
-      setIsMock(true);
-      setItems((MOCK_ME.past_sessions as unknown as SessionItem[]) || []);
-      setIsLoading(false);
-      return;
-    }
-
     api.getMe()
       .then((data) => {
         setItems((data.past_sessions as unknown as SessionItem[]) || []);
@@ -54,7 +44,6 @@ export default function ChatHistoryPage() {
             ← 返回
           </button>
           <h1 style={st.title}>💬 聊天记录</h1>
-          {isMock && <span style={st.mockBadge}>Mock</span>}
         </div>
 
         {isLoading && <LoadingSpinner text="加载中…" />}
