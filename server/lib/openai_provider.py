@@ -31,7 +31,17 @@ class OpenAIProvider(LLMProvider):
             self._last_prompt_tokens = response.usage.prompt_tokens if response.usage else 0
             self._last_completion_tokens = response.usage.completion_tokens if response.usage else 0
             raw = response.choices[0].message.content
+
+            # Detect LLM safety refusal (returns non-JSON text like "Sorry, I cannot...")
+            refusal_signals = ["sorry", "i cannot", "i can't", "i'm unable", "i am unable",
+                             "not appropriate", "cannot process", "can't process"]
+            raw_lower = raw.strip().lower()
+            if any(signal in raw_lower for signal in refusal_signals):
+                raise EmotionAnalysisError("LLM refused content (safety)", retryable=False)
+
             return raw  # 原始字符串 — 解析留给 schema_validator
+        except EmotionAnalysisError:
+            raise
         except Exception as e:
             raise EmotionAnalysisError(str(e), retryable=True)
 

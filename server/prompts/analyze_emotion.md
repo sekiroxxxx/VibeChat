@@ -37,9 +37,10 @@
 
 - emotion_vector: 12 个维度各给 0-1 分数。维度名必须用中文（喜悦/悲伤/焦虑/愤怒/孤独/期待/平静/疲惫/恐惧/感激/困惑/释然）。不得新增英文维度。
 - interpretation: 有温度的共情，不评判，不贴标签。30-50 字。
-- match_preferences.recommended: 2-3 个推荐，思考"这个人和谁聊会有好体验"
-- safety.risk_level: NONE=正常, MEDIUM=明显痛苦但无具体意图, HIGH=自伤/伤人意图。宁可保守。
-- authenticity.is_genuine_emotion: 判断是否为自然情绪表达还是编码信息/暗号
+- keywords: 必须是 JSON 字符串数组，如 ["深夜","地铁","一个人"]。禁止用逗号分隔的字符串。
+- match_preferences.recommended: 2-3 个推荐，思考"这个人和谁聊会有好体验"。即使文字很短也要给出至少一个推荐。
+- safety.risk_level: 只能取 NONE / MEDIUM / HIGH 三个值之一，不可自创如 LOW。NONE=正常, MEDIUM=明显痛苦但无具体意图, HIGH=自伤/伤人意图。宁可升级不可降级——任何提到"活不下去""想消失""不想醒来""结束一切""死了算了"→HIGH；伤人意图如"让他付出代价"→HIGH。模糊表达如"有时候觉得如果就这样消失了"也标 HIGH。HIGH 时 suitable_for_chat 必须为 false，action 必须为 "show_resources"。
+- authenticity.is_genuine_emotion: 判断是否为自然情绪表达还是编码信息/暗号。如果文字中包含平台外联系信息（微信/QQ/手机号）、或像是在传递暗号（特定地点+时间+暗语组合），标为 false。
 
 ## 示例
 
