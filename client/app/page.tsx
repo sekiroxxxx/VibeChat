@@ -1,199 +1,254 @@
 "use client";
-/** 情绪输入页 (/) — 引导式输入 + 氛围背景 */
+/** 首页 (/) — 情绪输入 · 底线式设计 · 日/夜主题 · 快捷chips · 最近记录 */
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useEmotionAnalysis } from "@/hooks/useEmotionAnalysis";
+import { useTheme } from "@/hooks/useTheme";
 import { sessionStore } from "@/lib/session-store";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { ErrorBanner } from "@/components/shared/ErrorBanner";
+import { api } from "@/api/client";
+import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
 
+/* ═══════ 常量 ═══════ */
 const PLACEHOLDERS = [
-  "今天发生了什么让你开心的事？",
-  "最近有什么让你感到焦虑的？",
-  "现在心里在想什么？想找人说说话吗？",
-  "用几句话描述你此刻的感受…",
+  "今天过得怎么样？",
+  "此刻的心情像什么颜色？",
+  "如果用一个词形容现在的你…",
+  "最近有什么一直在脑子里转的事吗？",
+];
+
+const CHIPS = [
+  { emoji: "🌙", label: "深夜孤独", text: "加班到深夜，地铁上一个人都没有，突然觉得好孤独" },
+  { emoji: "😰", label: "汇报焦虑", text: "明天要汇报，准备了很久还是睡不着" },
+  { emoji: "🍃", label: "周末平静", text: "周末在咖啡馆发呆，好久没这么安静了" },
+  { emoji: "🌧️", label: "关系困扰", text: "和朋友吵了一架，不知道还能不能和好" },
 ];
 
 const MAX_LENGTH = 500;
 
+interface RecentItem {
+  key: string;
+  emoji: string;
+  title: string;
+  date: string;
+  onClick: () => void;
+}
+
+/* ═══════ 组件 ═══════ */
 export default function HomePage() {
   const [text, setText] = useState("");
   const [phIdx, setPhIdx] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const { analyze, isLoading, error } = useEmotionAnalysis();
+  const { theme, toggle: toggleTheme } = useTheme();
   const router = useRouter();
   const submittingRef = useRef(false);
   const phTimerRef = useRef<ReturnType<typeof setInterval>>();
 
-  // placeholder 轮换：使用 ref 减少重渲染
+  /* ── Date ── */
+  const todayStr = useMemo(() => {
+    return new Date().toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      weekday: "long",
+    });
+  }, []);
+
+  /* ── Placeholder 轮换 ── */
   useEffect(() => {
     phTimerRef.current = setInterval(() => {
-      setPhIdx((i) => (i + 1) % PLACEHOLDERS.length);
-    }, 3000);
+      if (document.activeElement?.tagName !== "TEXTAREA") {
+        setPhIdx((i) => (i + 1) % PLACEHOLDERS.length);
+      }
+    }, 4000);
     return () => clearInterval(phTimerRef.current);
   }, []);
 
+  /* ── 加载最近记录 ── */
+  useEffect(() => {
+    let cancelled = false;
+    api.getMe().then((data) => {
+      if (cancelled) return;
+      const merged: RecentItem[] = [];
+
+      const history = (data.emotion_history as any[]) || [];
+      for (const h of history.slice(0, 3)) {
+        const ec = EMOTION_COLORS[h.primary_emotion] ?? DEFAULT_EMOTION_COLOR;
+        merged.push({
+          key: `emo-${h.session_id || Math.random()}`,
+          emoji: ec.emoji,
+          title: h.summary || h.feeling || h.primary_emotion || "情绪记录",
+          date: h.timestamp ? new Date(h.timestamp).toLocaleDateString("zh-CN", { month: "long", day: "numeric" }) : "",
+          onClick: () => h.session_id && router.push(`/result?history_id=${h.session_id}`),
+        });
+      }
+
+      const sessions = (data.past_sessions as any[]) || [];
+      for (const s of sessions.slice(0, 3)) {
+        const ec = EMOTION_COLORS[s.other_emotion] ?? DEFAULT_EMOTION_COLOR;
+        merged.push({
+          key: `chat-${s.session_id}`,
+          emoji: "💬",
+          title: `与「${s.other_name || "匿名用户"}」的对话`,
+          date: s.created_at ? new Date(s.created_at).toLocaleDateString("zh-CN", { month: "long", day: "numeric" }) : "",
+          onClick: () => router.push(`/chat-history/${s.session_id}`),
+        });
+      }
+
+      merged.sort((a, b) => b.date.localeCompare(a.date));
+      setRecentItems(merged.slice(0, 5));
+    }).catch(() => { /* 静默失败，最近记录非关键 */ });
+  }, [router]);
+
+  /* ── 提交 ── */
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed || trimmed.length > MAX_LENGTH || submittingRef.current) return;
     submittingRef.current = true;
+    setSubmitting(true);
     try {
       const result = await analyze(trimmed);
       if (!result) return;
       if (result.redirect === "care") {
         if (result.analysis) sessionStore.setAnalysis(result.analysis);
+        if (result.anonymousIdentity) sessionStore.setAnonymousIdentity(result.anonymousIdentity);
         router.push("/care");
         return;
       }
       if (result.analysis) {
         sessionStore.setAnalysis(result.analysis);
+        if (result.anonymousIdentity) sessionStore.setAnonymousIdentity(result.anonymousIdentity);
         router.push("/result");
       }
     } finally {
       submittingRef.current = false;
+      setSubmitting(false);
     }
   }, [text, analyze, router]);
 
-  const counterColor = useMemo(
-    () => text.length > MAX_LENGTH * 0.9 ? "#e74c3c" : "#999",
-    [text.length],
-  );
+  /* ── Chip 点击 ── */
+  const handleChip = useCallback((t: string) => {
+    setText(t);
+    document.querySelector<HTMLTextAreaElement>("#emotion-input")?.focus();
+  }, []);
 
-  const canSubmit = text.trim().length > 0 && !isLoading && !submittingRef.current;
+  const counterColor = text.length > MAX_LENGTH * 0.9 ? "var(--error-color)" : "var(--text3)";
+  const isBtnLoading = isLoading || submitting;
 
   return (
-    <main style={st.bg}>
-      {/* F1 — 顶部导航 */}
-      <nav style={st.nav}>
-        <a style={st.navLink} href="/history">📋 历史</a>
-        <a style={st.navLink} href="/chat-history">💬 聊天记录</a>
+    <>
+      {/* 氛围光晕 */}
+      <div className="atmo" style={{ "--hue": "30" } as React.CSSProperties} />
+
+      {/* 导航 */}
+      <nav className="nav">
+        <span className="logo">VibeChat</span>
+        <div className="nav-r">
+          <a href="/history">历史</a>
+          <button className="tgl" onClick={toggleTheme}>
+            <span>{theme === "day" ? "☀️" : "🌙"}</span>
+            <span>{theme === "day" ? "白天" : "黑夜"}</span>
+          </button>
+        </div>
       </nav>
 
-      <div style={st.card}>
-        <h1 style={st.title}>此刻，你的心情是怎样的？</h1>
-        <p style={st.subtitle}>
-          写下你的感受，AI 会帮你找到能理解你的人
-        </p>
-        <textarea
-          style={st.textarea}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={PLACEHOLDERS[phIdx]}
-          maxLength={MAX_LENGTH}
-          rows={5}
-          autoFocus
-        />
-        <div style={st.footer}>
-          <span style={{ ...st.counter, color: counterColor }}>
-            {text.length}/{MAX_LENGTH}
-          </span>
+      <main className="main">
+        {/* 日期 */}
+        <div className="date">{todayStr}</div>
+
+        {/* Hero */}
+        <div className="hero">
+          <h1>此刻的你</h1>
+          <p>
+            写下你的感受，让 AI 帮你理解当下的情绪。
+            <br />
+            一句话也行，一段话也行。
+          </p>
         </div>
 
-        {isLoading && <LoadingSpinner text="正在感受你的情绪…" />}
+        {/* 底线式输入 */}
+        <div className="input-area">
+          <textarea
+            id="emotion-input"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={PLACEHOLDERS[phIdx]}
+            rows={2}
+            maxLength={MAX_LENGTH}
+            autoFocus
+          />
+        </div>
 
-        {error && <ErrorBanner message={error} onRetry={() => handleSubmit()} />}
+        {/* 操作行：计数 + 按钮 */}
+        <div className="actions">
+          <span className="hint" style={{ color: counterColor }}>
+            {text.length > 0 ? `${text.length}/${MAX_LENGTH}` : ""}
+          </span>
+          <button
+            className={`btn${isBtnLoading ? " loading" : ""}`}
+            onClick={handleSubmit}
+            disabled={!text.trim() || isBtnLoading}
+          >
+            {isBtnLoading ? "感受中…" : "开始感受"}
+          </button>
+        </div>
 
-        <button
-          style={{ ...st.submitBtn, opacity: canSubmit ? 1 : 0.5 }}
-          disabled={!canSubmit}
-          onClick={handleSubmit}
-        >
-          开始分析
-        </button>
-      </div>
-    </main>
+        {/* 错误提示 */}
+        {error && (
+          <div style={st.error}>
+            <span>{error}</span>
+            <button style={st.retryBtn} onClick={handleSubmit}>重试</button>
+          </div>
+        )}
+
+        {/* 快捷情绪 Chips */}
+        <div className="chips">
+          {CHIPS.map((chip) => (
+            <button key={chip.label} onClick={() => handleChip(chip.text)}>
+              {chip.emoji} {chip.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 最近记录 */}
+        {recentItems.length > 0 && (
+          <div className="recent">
+            <span className="rl">最近</span>
+            {recentItems.map((item) => (
+              <button key={item.key} className="recent-item" onClick={item.onClick}>
+                <span className="ri-e">{item.emoji}</span>
+                <span className="ri-t">{item.title}</span>
+                <span className="ri-s">{item.date}</span>
+                <span className="ri-a">→</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </main>
+    </>
   );
 }
 
 const st: Record<string, React.CSSProperties> = {
-  nav: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "16px",
-    padding: "14px 24px",
-    zIndex: 10,
-  },
-  navLink: {
-    fontSize: "14px",
-    color: "rgba(0,0,0,0.45)",
-    textDecoration: "none",
-    padding: "4px 12px",
-    borderRadius: "8px",
-    background: "rgba(255,255,255,0.5)",
-    transition: "background 0.2s",
-  },
-  bg: {
-    position: "relative",
-    minHeight: "100vh",
+  error: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
-    background:
-      "linear-gradient(135deg, #e8e0f0, #f5e6e0, #e0e8f5, #f0e6f0)",
-    backgroundSize: "400% 400%",
-    animation: "moodShift 15s ease infinite",
-    padding: "20px",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "520px",
-    background: "rgba(255,255,255,0.88)",
-    backdropFilter: "blur(12px)",
-    borderRadius: "20px",
-    padding: "40px 32px",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.07)",
-    display: "flex",
-    flexDirection: "column",
-    gap: "18px",
-  },
-  title: {
-    fontSize: "28px",
-    fontWeight: 700,
-    color: "#2d2d2d",
-    textAlign: "center",
-    lineHeight: 1.3,
-  },
-  subtitle: {
-    fontSize: "15px",
-    color: "#999",
-    textAlign: "center",
-    marginTop: "-8px",
-  },
-  textarea: {
-    width: "100%",
-    padding: "16px",
-    borderRadius: "12px",
-    border: "1.5px solid #e0e0e0",
-    fontSize: "16px",
-    lineHeight: 1.7,
-    color: "#333",
-    background: "#fafafa",
-    minHeight: "140px",
-    outline: "none",
-    resize: "none",
-    fontFamily: "inherit",
-  },
-  footer: { display: "flex", justifyContent: "flex-end" },
-  counter: { fontSize: "13px" },
-  error: {
-    color: "#e74c3c",
-    fontSize: "14px",
-    textAlign: "center",
-    background: "#fdf0ef",
-    padding: "10px 12px",
+    justifyContent: "space-between",
+    padding: "10px 14px",
     borderRadius: "10px",
+    background: "var(--error-bg)",
+    color: "var(--error-color)",
+    fontSize: "13px",
+    marginBottom: "20px",
   },
-  submitBtn: {
-    padding: "14px 32px",
-    borderRadius: "12px",
-    background: "linear-gradient(135deg, #7c6ff7, #6e5ce6)",
-    color: "#fff",
-    fontSize: "17px",
-    fontWeight: 600,
-    width: "100%",
-    transition: "opacity 0.2s",
+  retryBtn: {
+    padding: "4px 12px",
+    borderRadius: "6px",
+    border: "1px solid var(--error-color)",
+    background: "transparent",
+    color: "var(--error-color)",
+    fontSize: "12px",
+    cursor: "pointer",
   },
 };

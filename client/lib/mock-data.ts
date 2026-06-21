@@ -172,54 +172,23 @@ export const MOCK_ME = {
     current_session_id: null,
     account_id: null,
   },
-  /* B1 — 情绪历史 */
+  /* B1 — 情绪历史 (时间线用) */
   emotion_history: [
-    {
-      primary_emotion: "疲惫",
-      summary: "工作后的疲惫中藏着对明天的期待，聊天后情绪从疲惫转向了平静和感激",
-      feeling: "聊完之后轻松了很多，感觉被理解了",
-      session_id: "mock-session-1",
-      timestamp: "2026-06-20T14:40:00Z",
-    },
-    {
-      primary_emotion: "焦虑",
-      summary: "面对新环境的焦虑，通过对话逐渐缓解",
-      session_id: "mock-session-2",
-      timestamp: "2026-06-19T20:15:00Z",
-    },
-    {
-      primary_emotion: "喜悦",
-      summary: "分享了一件开心的事，收获了共鸣和祝福",
-      session_id: "mock-session-3",
-      timestamp: "2026-06-18T12:00:00Z",
-    },
+    { primary_emotion: "孤独",  summary: "深夜加班后的空旷感。聊了 12 分钟后，感觉轻松了一些。", session_id: "mock-session-1", timestamp: "2026-06-20T23:15:00Z", matched: true, dur: "12 分钟", msgs: 14, chat_session_id: "mock-session-1" },
+    { primary_emotion: "焦虑",  summary: "明天的重要汇报。匹配成功但对话较短，只聊了 4 分钟。", session_id: "mock-session-2", timestamp: "2026-06-19T21:40:00Z", matched: true, dur: "4 分钟", msgs: 5, chat_session_id: "mock-session-2" },
+    { primary_emotion: "平静",  summary: "午休放空。没有选择匹配——自己待了一会儿就离开了。", session_id: "mock-session-3", timestamp: "2026-06-18T15:10:00Z", matched: false, dur: null, msgs: 0 },
+    { primary_emotion: "期待",  summary: "周末旅行前的兴奋。匹配到一个同样在计划旅行的人，聊得很投机。", session_id: "mock-session-4", timestamp: "2026-06-16T22:30:00Z", matched: true, dur: "20 分钟", msgs: 22, chat_session_id: "mock-session-4" },
+    { primary_emotion: "疲惫",  summary: "一周工作后的倦怠。匹配成功，对方给了很好的安慰。", session_id: "mock-session-5", timestamp: "2026-06-14T19:00:00Z", matched: true, dur: "8 分钟", msgs: 10, chat_session_id: "mock-session-5" },
+    { primary_emotion: "喜悦",  summary: "早上的好消息让一整天都明亮了。没有匹配，自己消化了这份开心。", session_id: "mock-session-6", timestamp: "2026-06-12T08:30:00Z", matched: false, dur: null, msgs: 0 },
+    { primary_emotion: "悲伤",  summary: "想起了一些过去的事。匹配成功，对方很温柔地倾听了很久。", session_id: "mock-session-7", timestamp: "2026-06-10T22:00:00Z", matched: true, dur: "16 分钟", msgs: 18, chat_session_id: "mock-session-7" },
   ],
-  /* B1 — 聊天记录列表 */
+  /* B1 — 聊天记录列表 (时间线用) */
   past_sessions: [
-    {
-      session_id: "mock-session-1",
-      other_name: "一杯温水",
-      other_emotion: "平静",
-      created_at: "2026-06-20T14:30:00Z",
-      closed_at: "2026-06-20T14:40:00Z",
-      status: "closed",
-    },
-    {
-      session_id: "mock-session-2",
-      other_name: "晨光里的人",
-      other_emotion: "期待",
-      created_at: "2026-06-19T20:00:00Z",
-      closed_at: "2026-06-19T20:15:00Z",
-      status: "closed",
-    },
-    {
-      session_id: "mock-session-3",
-      other_name: "刚晒过太阳的猫",
-      other_emotion: "喜悦",
-      created_at: "2026-06-18T11:30:00Z",
-      closed_at: "2026-06-18T12:00:00Z",
-      status: "closed",
-    },
+    { session_id: "mock-session-1", other_name: "一杯温水", other_emotion: "孤独", created_at: "2026-06-20T23:03:00Z", closed_at: "2026-06-20T23:15:00Z", status: "closed", msgs: 14, dur: "12 分钟" },
+    { session_id: "mock-session-2", other_name: "窗边的绿植", other_emotion: "焦虑", created_at: "2026-06-19T21:38:00Z", closed_at: "2026-06-19T21:42:00Z", status: "closed", msgs: 5, dur: "4 分钟" },
+    { session_id: "mock-session-4", other_name: "夜归的人", other_emotion: "期待", created_at: "2026-06-16T22:28:00Z", closed_at: "2026-06-16T22:50:00Z", status: "closed", msgs: 22, dur: "20 分钟" },
+    { session_id: "mock-session-5", other_name: "午后的阳光", other_emotion: "疲惫", created_at: "2026-06-14T18:55:00Z", closed_at: "2026-06-14T19:08:00Z", status: "closed", msgs: 10, dur: "8 分钟" },
+    { session_id: "mock-session-7", other_name: "晚风", other_emotion: "悲伤", created_at: "2026-06-10T21:55:00Z", closed_at: "2026-06-10T22:16:00Z", status: "closed", msgs: 18, dur: "16 分钟" },
   ],
 };
 
