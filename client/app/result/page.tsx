@@ -29,7 +29,6 @@ export default function ResultPage() {
 
   useEffect(() => {
     const a = sessionStore.getAnalysis();
-    // mock 模式：无 sessionStore 时注入 MOCK_ANALYSIS
     if (!a) {
       if (shouldMock()) { setAnalysis(MOCK_ANALYSIS); return; }
       router.replace("/");
@@ -38,23 +37,16 @@ export default function ResultPage() {
     setAnalysis(a);
   }, [router]);
 
-  if (!analysis) {
-    return (
-      <main style={st.bg}>
-        <EmptyState icon="🔍" title="没有分析结果" description="请先输入你的感受" action={{ label: "返回首页", onClick: () => router.push("/") }} />
-      </main>
-    );
-  }
-
+  // hooks 必须在所有条件 return 之前，避免数量变化
   const ec = useMemo(
-    () => EMOTION_COLORS[analysis.primary_emotion] ?? DEFAULT_EMOTION_COLOR,
-    [analysis.primary_emotion],
+    () => analysis ? (EMOTION_COLORS[analysis.primary_emotion] ?? DEFAULT_EMOTION_COLOR) : DEFAULT_EMOTION_COLOR,
+    [analysis],
   );
   const recommendations = useMemo(
-    () => analysis.match_preferences.recommended ?? [],
-    [analysis.match_preferences.recommended],
+    () => analysis?.match_preferences?.recommended ?? [],
+    [analysis],
   );
-  const isMedium = analysis.safety.risk_level === "MEDIUM";
+  const isMedium = analysis?.safety?.risk_level === "MEDIUM";
 
   const canMatch = useMemo(
     () =>
@@ -63,6 +55,14 @@ export default function ResultPage() {
       (mode === "free" && targetEmotion.trim() !== ""),
     [mode, targetEmotion],
   );
+
+  if (!analysis) {
+    return (
+      <main style={st.bg}>
+        <EmptyState icon="🔍" title="没有分析结果" description="请先输入你的感受" action={{ label: "返回首页", onClick: () => router.push("/") }} />
+      </main>
+    );
+  }
 
   const handleMatch = () => {
     let finalTarget: string | undefined;
