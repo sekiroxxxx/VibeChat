@@ -1,5 +1,6 @@
 "use client";
-/** 情绪画像页 (/result) — 情绪卡片 + 匹配模式选择 */
+/** 情绪画像页 (/result) — 情绪卡片 + 匹配模式选择
+ *  F2: 支持 ?history_id=N → 历史回顾模式（隐藏匹配区） */
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { sessionStore } from "@/lib/session-store";
@@ -20,6 +21,10 @@ export default function ResultPage() {
   const [mode, setMode] = useState<MatchMode>("auto");
   const [targetEmotion, setTargetEmotion] = useState("");
   const router = useRouter();
+  const historyId = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("history_id")
+    : null;
+  const isHistory = !!historyId;
 
   useEffect(() => {
     const a = sessionStore.getAnalysis();
@@ -111,68 +116,78 @@ export default function ResultPage() {
           </div>
         )}
 
-        {/* 匹配模式选择 */}
-        <div>
-          <h2 style={st.sectionTitle}>选择匹配方式</h2>
-          <div className="mode-grid" style={st.modeGrid}>
-            {(Object.keys(MODE_META) as MatchMode[]).map((m) => (
-              <button
-                key={m}
-                style={{
-                  ...st.modeCard,
-                  borderColor: mode === m ? "#7c6ff7" : "#eee",
-                  background: mode === m ? "#f8f6ff" : "#fff",
-                }}
-                onClick={() => {
-                  setMode(m);
-                  setTargetEmotion("");
-                }}
-              >
-                <span style={st.modeIcon}>{MODE_META[m].icon}</span>
-                <span style={st.modeLabel}>{MODE_META[m].label}</span>
-                <span style={st.modeDesc}>{MODE_META[m].desc}</span>
-              </button>
-            ))}
+        {/* F2 — 历史模式：隐藏匹配区，显示聊天记录链接 */}
+        {isHistory ? (
+          <div style={st.historyLinks}>
+            <a style={st.historyLink} href={`/chat-history/${historyId}`}>
+              💬 查看聊天记录 →
+            </a>
+            <a style={st.historyLinkSecondary} href="/history">
+              ← 返回历史列表
+            </a>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* 匹配模式选择 */}
+            <div>
+              <h2 style={st.sectionTitle}>选择匹配方式</h2>
+              <div className="mode-grid" style={st.modeGrid}>
+                {(Object.keys(MODE_META) as MatchMode[]).map((m) => (
+                  <button
+                    key={m}
+                    style={{
+                      ...st.modeCard,
+                      borderColor: mode === m ? "#7c6ff7" : "#eee",
+                      background: mode === m ? "#f8f6ff" : "#fff",
+                    }}
+                    onClick={() => { setMode(m); setTargetEmotion(""); }}
+                  >
+                    <span style={st.modeIcon}>{MODE_META[m].icon}</span>
+                    <span style={st.modeLabel}>{MODE_META[m].label}</span>
+                    <span style={st.modeDesc}>{MODE_META[m].desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* 引导模式：推荐列表 */}
-        {mode === "guided" && recommendations.length > 0 && (
-          <div style={st.recList}>
-            {recommendations.map((rec, i) => (
-              <button
-                key={i}
-                style={{
-                  ...st.recItem,
-                  borderColor:
-                    targetEmotion === rec.target_emotion ? "#7c6ff7" : "#eee",
-                }}
-                onClick={() => setTargetEmotion(rec.target_emotion)}
-              >
-                <span style={st.recEmotion}>{rec.target_emotion}</span>
-                <span style={st.recReason}>{rec.reason}</span>
-              </button>
-            ))}
-          </div>
+            {/* 引导模式：推荐列表 */}
+            {mode === "guided" && recommendations.length > 0 && (
+              <div style={st.recList}>
+                {recommendations.map((rec, i) => (
+                  <button
+                    key={i}
+                    style={{
+                      ...st.recItem,
+                      borderColor: targetEmotion === rec.target_emotion ? "#7c6ff7" : "#eee",
+                    }}
+                    onClick={() => setTargetEmotion(rec.target_emotion)}
+                  >
+                    <span style={st.recEmotion}>{rec.target_emotion}</span>
+                    <span style={st.recReason}>{rec.reason}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 自由模式：自定义输入 */}
+            {mode === "free" && (
+              <input
+                style={st.input}
+                value={targetEmotion}
+                onChange={(e) => setTargetEmotion(e.target.value)}
+                placeholder="输入你想匹配的情绪类型，如：平静"
+              />
+            )}
+
+            <button
+              style={{ ...st.matchBtn, opacity: canMatch ? 1 : 0.5 }}
+              disabled={!canMatch}
+              onClick={handleMatch}
+            >
+              开始匹配
+            </button>
+          </>
         )}
-
-        {/* 自由模式：自定义输入 */}
-        {mode === "free" && (
-          <input
-            style={st.input}
-            value={targetEmotion}
-            onChange={(e) => setTargetEmotion(e.target.value)}
-            placeholder="输入你想匹配的情绪类型，如：平静"
-          />
-        )}
-
-        <button
-          style={{ ...st.matchBtn, opacity: canMatch ? 1 : 0.5 }}
-          disabled={!canMatch}
-          onClick={handleMatch}
-        >
-          开始匹配
-        </button>
       </div>
     </main>
   );
@@ -290,5 +305,29 @@ const st: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     width: "100%",
     transition: "opacity 0.2s",
+  },
+  /* F2 — 历史模式链接 */
+  historyLinks: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    alignItems: "center",
+  },
+  historyLink: {
+    display: "block",
+    padding: "14px 32px",
+    borderRadius: "12px",
+    background: "#7c6ff7",
+    color: "#fff",
+    fontSize: "16px",
+    fontWeight: 600,
+    textAlign: "center",
+    textDecoration: "none",
+    width: "100%",
+  },
+  historyLinkSecondary: {
+    fontSize: "14px",
+    color: "#999",
+    textDecoration: "none",
   },
 };

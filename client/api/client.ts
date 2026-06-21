@@ -16,6 +16,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  /** 通用 GET 请求 */
+  get: <T>(path: string) => request<T>(path),
+
   createGuest: () =>
     request<{ user_id: string; auth_type: string }>("/api/auth/guest", { method: "POST" }),
 

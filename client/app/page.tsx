@@ -62,6 +62,12 @@ export default function HomePage() {
 
   return (
     <main style={st.bg}>
+      {/* F1 — 顶部导航 */}
+      <nav style={st.nav}>
+        <a style={st.navLink} href="/history">📋 历史</a>
+        <a style={st.navLink} href="/chat-history">💬 聊天记录</a>
+      </nav>
+
       <div style={st.card}>
         <h1 style={st.title}>此刻，你的心情是怎样的？</h1>
         <p style={st.subtitle}>
@@ -99,7 +105,28 @@ export default function HomePage() {
 }
 
 const st: Record<string, React.CSSProperties> = {
+  nav: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "16px",
+    padding: "14px 24px",
+    zIndex: 10,
+  },
+  navLink: {
+    fontSize: "14px",
+    color: "rgba(0,0,0,0.45)",
+    textDecoration: "none",
+    padding: "4px 12px",
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.5)",
+    transition: "background 0.2s",
+  },
   bg: {
+    position: "relative",
     minHeight: "100vh",
     display: "flex",
     alignItems: "center",
