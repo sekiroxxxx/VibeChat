@@ -30,6 +30,13 @@ async def get_session(session_id: str, request: Request):
 @router.post("/api/sessions/{session_id}/leave")
 async def leave_session(session_id: str, request: Request):
     user = _get_user(request)
+
+    # 标记主动离开者 — SSE 掉线检测用
+    session = await get(session_id, request.app.state.session_store)
+    if session:
+        session["left_by"] = user["user_id"]
+        await request.app.state.session_store.save(session)
+
     result = await leave(
         session_id=session_id,
         user_id=user["user_id"],

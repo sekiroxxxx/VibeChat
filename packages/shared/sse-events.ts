@@ -9,6 +9,7 @@ export enum SSEEventType {
   NOTIFICATION = "notification",
   ERROR = "error",
   HEARTBEAT = "heartbeat",
+  TYPING = "typing",
 }
 
 export interface SSEMessageEvent {
@@ -50,4 +51,12 @@ export interface SSEErrorEvent {
   };
 }
 
-export type SSEEvent = SSEMessageEvent | SSEStatusEvent | SSENotificationEvent | SSEErrorEvent;
+export interface SSETypingEvent {
+  type: SSEEventType.TYPING;
+  data: {
+    session_id: string;
+    sender_anonymous_id: string;
+  };
+}
+
+export type SSEEvent = SSEMessageEvent | SSEStatusEvent | SSENotificationEvent | SSEErrorEvent | SSETypingEvent;

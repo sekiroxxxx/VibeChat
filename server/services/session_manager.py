@@ -25,7 +25,11 @@ async def close(session_id: str, session_store, event_bus):
 
 
 async def leave(session_id: str, user_id: str, session_store, user_store, event_bus):
-    """用户离开会话 → 通知对方 → 清理状态 → 用户可重新匹配"""
+    """
+    用户离开会话 → 通知对方 → 清理双方状态 → 关闭会话
+    注意: left_by 标记由调用方 (routes/sessions.py) 在调用前写入 session，
+    供 SSE 掉线检测 (routes/stream.py) 区分主动离开/断线。
+    """
     session = await session_store.get(session_id)
     if not session:
         return {"error": "会话不存在"}

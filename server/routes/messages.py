@@ -57,3 +57,30 @@ async def send_message(session_id: str, body: SendMessageRequest, request: Reque
     })
 
     return {"sent": True, "message": msg}
+
+
+@router.post("/api/sessions/{session_id}/typing")
+async def send_typing(session_id: str, request: Request):
+    """输入状态通知 → SSE 广播给对方"""
+    user_id = request.cookies.get(COOKIE_NAME)
+    if not user_id:
+        raise HTTPException(401, "请先创建游客身份")
+
+    session = await request.app.state.session_store.get(session_id)
+    if not session:
+        raise HTTPException(404, "会话不存在")
+    if session["status"] != "active":
+        raise HTTPException(400, "会话已结束")
+    if user_id not in (session["user_a"]["id"], session["user_b"]["id"]):
+        raise HTTPException(403, "无权操作")
+
+    user_key = "user_a" if session["user_a"]["id"] == user_id else "user_b"
+
+    await request.app.state.event_bus.publish(session_id, {
+        "type": "typing",
+        "data": {
+            "session_id": session_id,
+            "sender_anonymous_id": session[user_key]["anonymous_name"],
+        },
+    })
+    return {"ok": True}
