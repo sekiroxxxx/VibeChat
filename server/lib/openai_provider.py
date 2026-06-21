@@ -31,7 +31,7 @@ class OpenAIProvider(LLMProvider):
             self._last_prompt_tokens = response.usage.prompt_tokens if response.usage else 0
             self._last_completion_tokens = response.usage.completion_tokens if response.usage else 0
             raw = response.choices[0].message.content
-            return json.loads(raw)  # 原始 JSON — 解析留给 schema_validator
+            return raw  # 原始字符串 — 解析留给 schema_validator
         except Exception as e:
             raise EmotionAnalysisError(str(e), retryable=True)
 
