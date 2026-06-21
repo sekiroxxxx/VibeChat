@@ -74,13 +74,14 @@ app.add_middleware(
 )
 
 # 路由注册
-from server.routes import auth, analyze, match, sessions, messages, stream, demo, debug, health
+from server.routes import auth, analyze, match, sessions, messages, stream, summary, demo, debug, health
 app.include_router(auth.router)
 app.include_router(analyze.router)
 app.include_router(match.router)
 app.include_router(sessions.router)
 app.include_router(messages.router)
 app.include_router(stream.router)
+app.include_router(summary.router)
 app.include_router(demo.router)
 app.include_router(debug.router)
 app.include_router(health.router)

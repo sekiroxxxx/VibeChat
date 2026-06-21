@@ -2,7 +2,7 @@
 import json
 from anthropic import AsyncAnthropic
 from server.lib.llm_provider import LLMProvider, LLMConfig, EmotionAnalysisError
-from server.prompts.index import ANALYZE_PROFILE, OPENING_PROFILE
+from server.prompts.index import ANALYZE_PROFILE, OPENING_PROFILE, SUMMARY_PROFILE
 
 
 class AnthropicProvider(LLMProvider):
@@ -53,4 +53,28 @@ class AnthropicProvider(LLMProvider):
                 "opening_message": "你们此刻都在经历相似的心情，聊聊吧 ✨",
                 "for_user_a": "",
                 "for_user_b": "",
+            }
+
+    async def generate_chat_summary(self, messages: list[dict], feeling: str, emotion_before: dict) -> dict:
+        chat_text = "\n".join(
+            f"[{m['sender_anonymous_id']}]: {m['content']}" for m in messages
+        )
+        user_prompt = (
+            f"聊天前情绪: {emotion_before.get('primary_emotion', '')}\n"
+            f"对话记录:\n{chat_text}\n\n"
+            f"聊后感受: {feeling}"
+        )
+        try:
+            response = await self.client.messages.create(
+                model=self.model,
+                temperature=SUMMARY_PROFILE.temperature,
+                max_tokens=SUMMARY_PROFILE.max_tokens,
+                system=SUMMARY_PROFILE.system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            return json.loads(response.content[0].text)
+        except (json.JSONDecodeError, Exception):
+            return {
+                "summary": "感谢你的分享，这段对话已经结束。",
+                "emotion_shift": {"before": emotion_before.get("primary_emotion", ""), "after_hint": "情绪似乎有了微妙的变化"},
             }

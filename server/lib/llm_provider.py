@@ -48,6 +48,16 @@ class LLMProvider(ABC):
         """生成对话开场白 → OpeningMessage JSON"""
         ...
 
+    @abstractmethod
+    async def generate_chat_summary(
+        self,
+        messages: list[dict],
+        feeling: str,
+        emotion_before: dict,
+    ) -> dict:
+        """生成聊天总结 → {summary, emotion_shift} JSON"""
+        ...
+
 
 def create_llm_provider(config: LLMConfig) -> LLMProvider:
     """

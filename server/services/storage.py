@@ -28,6 +28,8 @@ class SessionStore(ABC):
     async def save(self, session: dict) -> None: ...
     @abstractmethod
     async def delete(self, session_id: str) -> None: ...
+    @abstractmethod
+    async def list_by_user(self, user_id: str) -> list[dict]: ...
 
 
 class MatchQueue(ABC):
@@ -70,6 +72,9 @@ class InMemorySessionStore(SessionStore):
     async def get(self, sid): return self._sessions.get(sid)
     async def save(self, s):   self._sessions[s["session_id"]] = s
     async def delete(self, sid): self._sessions.pop(sid, None)
+    async def list_by_user(self, user_id):
+        return [s for s in self._sessions.values()
+                if user_id in (s.get("user_a", {}).get("id"), s.get("user_b", {}).get("id"))]
 
 
 class InMemoryMatchQueue(MatchQueue):

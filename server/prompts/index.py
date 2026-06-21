@@ -34,3 +34,10 @@ OPENING_PROFILE = AgentProfile(
     temperature=0.7,             # 中温 — 开场白需要多样性
     max_tokens=256,
 )
+
+SUMMARY_PROFILE = AgentProfile(
+    name="chat_summary",
+    system_prompt=load_prompt("chat_summary.md"),
+    temperature=0.7,             # 中温 — 总结需要共情而非精确
+    max_tokens=512,
+)
