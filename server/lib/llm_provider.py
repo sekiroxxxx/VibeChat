@@ -65,19 +65,24 @@ def create_llm_provider(config: LLMConfig) -> LLMProvider:
 
 # ── 降级处理 ──
 
-async def analyze_with_fallback(provider: LLMProvider, text: str) -> dict:
+async def analyze_with_fallback(provider: LLMProvider, text: str) -> tuple[dict, bool]:
     """
-    JSON 校验失败 → 重试一次 → 仍失败 → 返回默认情绪
+    调用 LLM → schema 校验 → 重试一次 → 仍失败返回默认情绪
+
+    Returns:
+        (emotion_dict, is_fallback) — is_fallback=True 表示使用了降级值
     """
     from server.lib.schema_validator import parse_llm_output
     from server.lib.fallback import EMOTION_FALLBACK_DEFAULT
 
-    try:
-        result = await provider.analyze_emotion(text)
-        return parse_llm_output(result)
-    except EmotionAnalysisError:
+    for attempt in range(2):
         try:
-            result = await provider.analyze_emotion(text)
-            return parse_llm_output(result)
+            raw = await provider.analyze_emotion(text)
         except EmotionAnalysisError:
-            return EMOTION_FALLBACK_DEFAULT
+            continue
+
+        parsed = parse_llm_output(raw)
+        if not parsed.get("parseError"):
+            return parsed["data"], False
+
+    return EMOTION_FALLBACK_DEFAULT, True
