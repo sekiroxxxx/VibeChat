@@ -36,15 +36,26 @@ class OpenAIProvider(LLMProvider):
             raise EmotionAnalysisError(str(e), retryable=True)
 
     async def generate_opening_message(self, emotion_a: dict, emotion_b: dict, ctx: str) -> dict:
-        prompt = OPENING_PROFILE.system_prompt.format(
-            emotion_a_summary=f"{emotion_a.get('primary_emotion')} + {emotion_a.get('secondary_emotion', '')}",
-            emotion_b_summary=f"{emotion_b.get('primary_emotion')} + {emotion_b.get('secondary_emotion', '')}",
-            shared_context=ctx,
+        user_prompt = (
+            f"用户A情绪: {emotion_a.get('primary_emotion')} + {emotion_a.get('secondary_emotion', '')}\n"
+            f"用户B情绪: {emotion_b.get('primary_emotion')} + {emotion_b.get('secondary_emotion', '')}\n"
+            f"共享上下文: {ctx}"
         )
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            temperature=OPENING_PROFILE.temperature,
-            max_tokens=OPENING_PROFILE.max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return json.loads(response.choices[0].message.content)
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                temperature=OPENING_PROFILE.temperature,
+                max_tokens=OPENING_PROFILE.max_tokens,
+                messages=[
+                    {"role": "system", "content": OPENING_PROFILE.system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            raw = response.choices[0].message.content
+            return json.loads(raw)
+        except (json.JSONDecodeError, Exception):
+            return {
+                "opening_message": "你们此刻都在经历相似的心情，聊聊吧 ✨",
+                "for_user_a": "",
+                "for_user_b": "",
+            }

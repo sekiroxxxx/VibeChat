@@ -53,10 +53,10 @@ async def match_user(user: dict, match_queue, session_store, opening_generator):
 
         near_identical = False
         if sim > SIMILARITY_CEILING:
-            sim -= SIMILARITY_CEILING_PENALTY
+            sim = max(sim - SIMILARITY_CEILING_PENALTY, SIMILARITY_THRESHOLD)
             near_identical = True
 
-        if sim > SIMILARITY_THRESHOLD:
+        if sim >= SIMILARITY_THRESHOLD:
             candidates.append((other, sim, near_identical))
 
     if not candidates:
