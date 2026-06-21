@@ -23,7 +23,12 @@ export const api = {
     request<{ user_id: string; auth_type: string }>("/api/auth/guest", { method: "POST" }),
 
   getMe: () =>
-    request<{ authenticated: boolean; user?: Record<string, unknown> }>("/api/me"),
+    request<{
+      authenticated: boolean;
+      user?: Record<string, unknown>;
+      emotion_history?: Record<string, unknown>[];
+      past_sessions?: Record<string, unknown>[];
+    }>("/api/me"),
 
   /** 返回 analysis + identity；HIGH 风险时返回 redirect + safety */
   analyze: (text: string) =>
@@ -58,6 +63,12 @@ export const api = {
 
   sendTyping: (sessionId: string) =>
     request<void>(`/api/sessions/${sessionId}/typing`, { method: "POST" }),
+
+  summary: (sessionId: string, feeling: string) =>
+    request<{ summary: string; emotion_shift: { before: string; after_hint: string } }>(
+      `/api/sessions/${sessionId}/summary`,
+      { method: "POST", body: JSON.stringify({ feeling }) },
+    ),
 
   getStreamUrl: (sessionId: string) =>
     `${BASE}/api/sessions/${sessionId}/stream`,

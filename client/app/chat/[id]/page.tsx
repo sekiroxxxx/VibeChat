@@ -97,7 +97,7 @@ export default function ChatPage() {
         } else if (data.status === "closing") {
           setStatusNote("对方已离开，当前会话即将关闭");
         } else if (data.status === "closed") {
-          router.replace("/closed");
+          router.replace(`/summary/${sessionId}`);
         }
       },
       onError: (msg, retryable) => {
@@ -158,7 +158,7 @@ export default function ChatPage() {
       await api.leaveSession(sessionId);
     } catch { /* 忽略 */ }
     sse.disconnect();
-    router.replace("/closed");
+    router.replace(`/summary/${sessionId}`);
   }, [sessionId, sse, router]);
 
   const handleReport = useCallback(async () => {
