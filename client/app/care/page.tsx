@@ -7,113 +7,75 @@ import type { EmotionAnalysis } from "@shared/types";
 
 const DEFAULT_RESOURCES = [
   { name: "全国心理援助热线", phone: "400-161-9995" },
-  { name: "北京心理危机研究与干预中心", phone: "010-82951332" },
   { name: "希望 24 热线", phone: "400-161-9995" },
+  { name: "北京心理危机研究与干预中心", phone: "010-82951332" },
 ];
 
 export default function CarePage() {
   const [analysis, setAnalysis] = useState<EmotionAnalysis | null>(null);
+  const [theme, setTheme] = useState<"day" | "night">("day");
   const router = useRouter();
 
   useEffect(() => {
     const a = sessionStore.getAnalysis();
     if (a) setAnalysis(a);
+    const saved = localStorage.getItem("vb_theme") as "day" | "night" | null;
+    if (saved) setTheme(saved);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("vb_theme", theme);
+  }, [theme]);
 
   const resources = analysis?.safety?.resources?.length
     ? analysis.safety.resources.map((r) => ({ name: r, phone: "" }))
     : DEFAULT_RESOURCES;
 
   return (
-    <main style={st.bg}>
-      <div style={st.card}>
-        <span style={st.emoji}>💙</span>
-        <h1 style={st.title}>我们在这里</h1>
+    <>
+      <div className="care-atmo" />
 
-        {analysis?.interpretation && (
-          <p style={st.interpretation}>{analysis.interpretation}</p>
-        )}
+      <nav className="nav">
+        <span className="logo">VibeChat</span>
+        <button className="tgl" onClick={() => setTheme((t) => (t === "day" ? "night" : "day"))} style={{ marginLeft: "auto" }}>
+          <span>{theme === "day" ? "☀️" : "🌙"}</span>
+          <span>{theme === "day" ? "白天" : "黑夜"}</span>
+        </button>
+      </nav>
 
-        <p style={st.text}>
-          你不需要独自面对这一切。以下资源也许能帮到你：
+      <main className="care-main">
+        <div className="care-hero">
+          <span className="ce">🕯️</span>
+          <h1>这些感受是重要的</h1>
+          <p>
+            {analysis?.interpretation
+              ? analysis.interpretation
+              : "聊天可能不是此刻最适合的方式。\n这里有一些或许能帮到你的资源——"}
+          </p>
+        </div>
+
+        <div className="care-resources">
+          <span className="rl">求助资源</span>
+          {resources.map((r, i) => (
+            <div key={i} className="care-resource">
+              <span className="re">📞</span>
+              <span className="rt">{r.name}</span>
+              {r.phone && <span className="rp">{r.phone}</span>}
+            </div>
+          ))}
+        </div>
+
+        <p className="care-msg">
+          你不需要独自面对这一切。
+          <br />
+          任何时候你觉得准备好了，<span className="highlight">我们都在这里</span>。
         </p>
 
-        <ul style={st.list}>
-          {resources.map((r, i) => (
-            <li key={i} style={st.item}>
-              <span style={st.itemName}>{r.name}</span>
-              {r.phone && <span style={st.itemPhone}>{r.phone}</span>}
-            </li>
-          ))}
-        </ul>
-
-        <button style={st.btn} onClick={() => router.push("/")}>
+        <button className="btn-back" onClick={() => router.push("/")}>
           返回首页
         </button>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
-
-const st: Record<string, React.CSSProperties> = {
-  bg: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "linear-gradient(135deg, #e8f4fd, #f5edf8)",
-    padding: "20px",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "480px",
-    background: "#fff",
-    borderRadius: "20px",
-    padding: "40px 32px",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.06)",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "16px",
-    textAlign: "center",
-  },
-  emoji: { fontSize: "56px" },
-  title: { fontSize: "24px", fontWeight: 700, color: "#2d2d2d" },
-  interpretation: {
-    fontSize: "15px",
-    color: "#666",
-    lineHeight: 1.8,
-    background: "#f8f6ff",
-    padding: "12px 16px",
-    borderRadius: "10px",
-    maxWidth: "100%",
-  },
-  text: { fontSize: "15px", color: "#888" },
-  list: {
-    listStyle: "none",
-    textAlign: "left",
-    width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-  },
-  item: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "12px 16px",
-    background: "#f8f9fa",
-    borderRadius: "10px",
-  },
-  itemName: { fontSize: "14px", fontWeight: 500 },
-  itemPhone: { fontSize: "14px", color: "#7c6ff7", fontWeight: 600 },
-  btn: {
-    marginTop: "8px",
-    padding: "12px 36px",
-    borderRadius: "10px",
-    background: "#7c6ff7",
-    color: "#fff",
-    fontSize: "16px",
-    fontWeight: 600,
-  },
-};
