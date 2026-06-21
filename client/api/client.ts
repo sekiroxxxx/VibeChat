@@ -50,6 +50,12 @@ export const api = {
   leaveSession: (sessionId: string) =>
     request<void>(`/api/sessions/${sessionId}/leave`, { method: "POST" }),
 
+  report: (sessionId: string) =>
+    request<{ reported: boolean }>(`/api/sessions/${sessionId}/report`, { method: "POST" }),
+
+  sendTyping: (sessionId: string) =>
+    request<void>(`/api/sessions/${sessionId}/typing`, { method: "POST" }),
+
   getStreamUrl: (sessionId: string) =>
     `${BASE}/api/sessions/${sessionId}/stream`,
 };

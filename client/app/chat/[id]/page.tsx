@@ -4,19 +4,41 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { useRouter, useParams } from "next/navigation";
 import { useChat } from "@/hooks/useChat";
 import { useSSE } from "@/hooks/useSSE";
+import { useNotification } from "@/hooks/useNotification";
 import { sessionStore } from "@/lib/session-store";
 import { api } from "@/api/client";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
 import type { ChatSession, Message } from "@shared/types";
 
+/** 格式化 HH:mm */
+function fmtTime(ts: string) {
+  try {
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch { return ""; }
+}
+
+/** 日期分隔线组件 */
+const DateSeparator = React.memo(function DateSeparator({ label }: { label: string }) {
+  return (
+    <div style={st.dateSep}>
+      <span style={st.dateSepLine} />
+      <span style={st.dateSepText}>{label}</span>
+      <span style={st.dateSepLine} />
+    </div>
+  );
+});
+
 /** 单条消息气泡 — memo 避免全列表重渲染 */
 const ChatBubble = React.memo(function ChatBubble({
   msg,
+  time,
   isMine,
   isSystem,
 }: {
   msg: Message;
+  time: string;
   isMine: boolean;
   isSystem: boolean;
 }) {
@@ -27,13 +49,21 @@ const ChatBubble = React.memo(function ChatBubble({
         justifyContent: isSystem ? "center" : isMine ? "flex-end" : "flex-start",
       }}
     >
-      <div
-        style={{
-          ...st.msgBubble,
-          ...(isSystem ? st.systemBubble : isMine ? st.myBubble : st.otherBubble),
-        }}
-      >
-        {msg.content}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : isSystem ? "center" : "flex-start", maxWidth: "80%" }}>
+        <div
+          style={{
+            ...st.msgBubble,
+            ...(isSystem ? st.systemBubble : isMine ? st.myBubble : st.otherBubble),
+          }}
+        >
+          {msg.content}
+        </div>
+        <span style={{
+          ...st.msgTime,
+          textAlign: isSystem ? "center" : isMine ? "right" : "left",
+        }}>
+          {time}
+        </span>
       </div>
     </div>
   );
@@ -51,10 +81,12 @@ export default function ChatPage() {
   const [inputText, setInputText] = useState("");
   const [sseError, setSseError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  const [reportDone, setReportDone] = useState(false);
   const submittingRef = useRef(false);
 
   const chat = useChat([]);
   const sse = useSSE();
+  const notif = useNotification();
   const bottomRef = useRef<HTMLDivElement>(null);
   const connectedRef = useRef(false);
 
@@ -101,8 +133,17 @@ export default function ChatPage() {
     if (!sessionId || connectedRef.current) return;
     connectedRef.current = true;
 
+    // 预请求通知权限
+    notif.requestPermission();
+
     sse.connect(sessionId, {
-      onMessage: (msg) => chat.addMessage(msg),
+      onMessage: (msg) => {
+        chat.addMessage(msg);
+        // 对方消息 + 页面不可见 → 浏览器通知
+        if (msg.sender_anonymous_id !== myId && msg.type === "user") {
+          notif.notify(otherName || "聊天伙伴", msg.content.slice(0, 80));
+        }
+      },
       onStatus: (data) => {
         if (data.status === "closing") {
           setStatusNote("对方已离开，当前会话即将关闭");
@@ -144,16 +185,48 @@ export default function ChatPage() {
     router.replace("/closed");
   }, [sessionId, sse, router]);
 
-  // 消息类型映射 — 避免 render 中重复计算
-  const msgTypes = useMemo(() => {
-    const map = new Map<string, { isMine: boolean; isSystem: boolean }>();
+  const handleReport = useCallback(async () => {
+    if (reportDone) return;
+    if (!window.confirm("确定要举报此对话吗？")) return;
+    try {
+      await api.report(sessionId);
+      setReportDone(true);
+    } catch {
+      /* 忽略 */
+    }
+  }, [sessionId, reportDone]);
+
+  // 消息元数据 — 时间格式化 + 日期分隔 + 类型判断（一次性预计算）
+  const msgMeta = useMemo(() => {
+    const result: Array<{
+      msg: Message;
+      time: string;
+      dateLabel: string | null; // 非空时在此消息前插入日期分隔
+      isMine: boolean;
+      isSystem: boolean;
+    }> = [];
+    let prevTs = 0;
+    let prevDay = "";
+
     for (const msg of chat.messages) {
-      map.set(msg.id, {
+      const ts = new Date(msg.timestamp).getTime();
+      const day = new Date(msg.timestamp).toLocaleDateString();
+      const time = fmtTime(msg.timestamp);
+      const dateLabel = day !== prevDay ? day : null;
+
+      result.push({
+        msg,
+        time,
+        dateLabel,
         isMine: msg.sender_anonymous_id === myId,
         isSystem: msg.type === "system",
       });
+
+      prevTs = ts;
+      prevDay = day;
     }
-    return map;
+
+    return result;
   }, [chat.messages, myId]);
 
   if (!session) {
@@ -195,19 +268,19 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* 消息列表 — 每条气泡 memo 化，新消息不触发历史重渲染 */}
+      {/* 消息列表 — 每条气泡 memo 化 + 时间戳 + 日期分隔 */}
       <div style={st.msgList}>
-        {chat.messages.map((msg) => {
-          const t = msgTypes.get(msg.id);
-          return (
+        {msgMeta.map((m) => (
+          <React.Fragment key={m.msg.id}>
+            {m.dateLabel && <DateSeparator label={m.dateLabel} />}
             <ChatBubble
-              key={msg.id}
-              msg={msg}
-              isMine={t?.isMine ?? false}
-              isSystem={t?.isSystem ?? false}
+              msg={m.msg}
+              time={m.time}
+              isMine={m.isMine}
+              isSystem={m.isSystem}
             />
-          );
-        })}
+          </React.Fragment>
+        ))}
         <div ref={bottomRef} />
       </div>
 
@@ -236,9 +309,11 @@ export default function ChatPage() {
         </button>
       </div>
 
-      {/* 举报入口 */}
+      {/* 举报入口 — F1 */}
       <div style={st.reportBar}>
-        <button style={st.reportBtn}>⚠️ 举报</button>
+        <button style={st.reportBtn} onClick={handleReport} disabled={reportDone}>
+          {reportDone ? "✓ 已举报" : "⚠️ 举报"}
+        </button>
       </div>
     </main>
   );
@@ -365,5 +440,29 @@ const st: Record<string, React.CSSProperties> = {
     background: "none",
     textDecoration: "underline",
     padding: "4px",
+  },
+  /* F2 — 时间戳 */
+  msgTime: {
+    fontSize: "11px",
+    color: "#bbb",
+    marginTop: "3px",
+    padding: "0 4px",
+  },
+  /* F2 — 日期分隔线 */
+  dateSep: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "8px 0",
+  },
+  dateSepLine: {
+    flex: 1,
+    height: "1px",
+    background: "#e8e8e8",
+  },
+  dateSepText: {
+    fontSize: "12px",
+    color: "#bbb",
+    whiteSpace: "nowrap",
   },
 };
