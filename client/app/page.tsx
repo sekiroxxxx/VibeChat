@@ -34,10 +34,14 @@ export default function HomePage() {
     if (!trimmed || trimmed.length > MAX_LENGTH) return;
     const result = await analyze(trimmed);
     if (!result) return;
-    sessionStore.setAnalysis(result);
-    if (result.safety.risk_level === "HIGH") {
+    if (result.redirect === "care") {
+      if (result.analysis) sessionStore.setAnalysis(result.analysis);
       router.push("/care");
-    } else {
+      return;
+    }
+    if (result.analysis) {
+      sessionStore.setAnalysis(result.analysis);
+      sessionStore.setUserId(sessionStore.getUserId());
       router.push("/result");
     }
   }, [text, analyze, router]);

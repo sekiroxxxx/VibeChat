@@ -56,8 +56,8 @@ export function useSSE(): UseSSEReturn {
       es.addEventListener(SSEEventType.MESSAGE, (e: MessageEvent) => {
         resetDeadTimer();
         try {
-          const event = JSON.parse(e.data);
-          callbacksRef.current.onMessage?.(event.data);
+          const msg = JSON.parse(e.data); // server 直接 emit Message 对象
+          callbacksRef.current.onMessage?.(msg);
         } catch {
           /* 跳过畸形消息 */
         }
@@ -66,8 +66,8 @@ export function useSSE(): UseSSEReturn {
       es.addEventListener(SSEEventType.STATUS, (e: MessageEvent) => {
         resetDeadTimer();
         try {
-          const event = JSON.parse(e.data);
-          callbacksRef.current.onStatus?.(event.data);
+          const status = JSON.parse(e.data); // {session_id, status, reason}
+          callbacksRef.current.onStatus?.(status);
         } catch {
           /* 跳过 */
         }
@@ -79,8 +79,8 @@ export function useSSE(): UseSSEReturn {
 
       es.addEventListener(SSEEventType.ERROR, (e: MessageEvent) => {
         try {
-          const event = JSON.parse(e.data);
-          callbacksRef.current.onError?.(event.data.message, event.data.retryable);
+          const err = JSON.parse(e.data); // {message, code, retryable}
+          callbacksRef.current.onError?.(err.message, err.retryable);
         } catch {
           callbacksRef.current.onError?.("收到服务端错误", false);
         }

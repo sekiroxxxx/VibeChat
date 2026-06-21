@@ -17,13 +17,20 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   createGuest: () =>
-    request<{ user_id: string; anonymous_identity: string }>("/api/auth/guest", { method: "POST" }),
+    request<{ user_id: string; auth_type: string }>("/api/auth/guest", { method: "POST" }),
 
   getMe: () =>
-    request<{ user: any }>("/api/me"),
+    request<{ authenticated: boolean; user?: Record<string, unknown> }>("/api/me"),
 
+  /** 返回 analysis + identity；HIGH 风险时返回 redirect + safety */
   analyze: (text: string) =>
-    request<{ analysis: any; anonymous_identity: string }>("/api/analyze", {
+    request<{
+      analysis?: Record<string, unknown>;
+      anonymous_identity?: string;
+      redirect?: string;
+      safety?: Record<string, unknown>;
+      is_fallback?: boolean;
+    }>("/api/analyze", {
       method: "POST", body: JSON.stringify({ text }),
     }),
 

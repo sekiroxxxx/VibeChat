@@ -49,15 +49,19 @@ export default function ChatPage() {
       EMOTION_COLORS[other.emotion.primary_emotion] ?? DEFAULT_EMOTION_COLOR;
     setHeaderEmoji(ec.emoji);
 
-    // 初始化消息列表（含开场白）
+    // 初始化消息列表（含开场白 — server 返回 OpeningMessage object 或 string）
     const initial: Message[] = [];
-    if (sess.opening_message) {
+    const openingText =
+      typeof sess.opening_message === "string"
+        ? sess.opening_message
+        : (sess.opening_message as Record<string, unknown>)?.opening_message as string || "";
+    if (openingText) {
       initial.push({
         id: "opening",
         session_id: sessionId,
         type: "system",
         sender_anonymous_id: "system",
-        content: sess.opening_message,
+        content: openingText,
         timestamp: sess.created_at,
       });
     }
