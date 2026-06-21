@@ -1,14 +1,43 @@
 "use client";
 /** 匿名聊天页 (/chat/:id) — 消息列表 + 输入 + SSE */
-import { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useChat } from "@/hooks/useChat";
 import { useSSE } from "@/hooks/useSSE";
 import { sessionStore } from "@/lib/session-store";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { api } from "@/api/client";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
 import type { ChatSession, Message } from "@shared/types";
+
+/** 单条消息气泡 — memo 避免全列表重渲染 */
+const ChatBubble = React.memo(function ChatBubble({
+  msg,
+  isMine,
+  isSystem,
+}: {
+  msg: Message;
+  isMine: boolean;
+  isSystem: boolean;
+}) {
+  return (
+    <div
+      style={{
+        ...st.msgRow,
+        justifyContent: isSystem ? "center" : isMine ? "flex-end" : "flex-start",
+      }}
+    >
+      <div
+        style={{
+          ...st.msgBubble,
+          ...(isSystem ? st.systemBubble : isMine ? st.myBubble : st.otherBubble),
+        }}
+      >
+        {msg.content}
+      </div>
+    </div>
+  );
+});
 
 export default function ChatPage() {
   const params = useParams<{ id: string }>();
@@ -18,11 +47,11 @@ export default function ChatPage() {
   const [session, setSession] = useState<ChatSession | null>(null);
   const [myId, setMyId] = useState("");
   const [otherName, setOtherName] = useState("");
-  const [otherEmotion, setOtherEmotion] = useState("");
   const [headerEmoji, setHeaderEmoji] = useState("💭");
   const [inputText, setInputText] = useState("");
   const [sseError, setSseError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   const chat = useChat([]);
   const sse = useSSE();
@@ -35,7 +64,6 @@ export default function ChatPage() {
     if (!sess || sess.session_id !== sessionId) return;
     setSession(sess);
 
-    // 判断我是 user_a 还是 user_b
     const storedUserId = sessionStore.getUserId();
     const isA = sess.user_a.id === storedUserId;
     const me = isA ? sess.user_a : sess.user_b;
@@ -43,13 +71,12 @@ export default function ChatPage() {
 
     setMyId(me.id);
     setOtherName(other.anonymous_name);
-    setOtherEmotion(other.emotion.primary_emotion);
 
     const ec =
       EMOTION_COLORS[other.emotion.primary_emotion] ?? DEFAULT_EMOTION_COLOR;
     setHeaderEmoji(ec.emoji);
 
-    // 初始化消息列表（含开场白 — server 返回 OpeningMessage object 或 string）
+    // 初始化消息列表（含开场白）
     const initial: Message[] = [];
     const openingText =
       typeof sess.opening_message === "string"
@@ -94,26 +121,40 @@ export default function ChatPage() {
     };
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 自动滚到底部
+  // 自动滚到底部 — 新消息时触发
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat.messages]);
 
   const handleSend = useCallback(() => {
     const text = inputText.trim();
-    if (!text || text.length > 1000) return;
-    chat.sendMessage(sessionId, text);
+    if (!text || text.length > 1000 || submittingRef.current) return;
+    submittingRef.current = true;
+    chat.sendMessage(sessionId, text).finally(() => {
+      submittingRef.current = false;
+    });
     setInputText("");
   }, [inputText, chat, sessionId]);
 
   const handleLeave = useCallback(async () => {
-    const { api } = await import("@/api/client");
     try {
       await api.leaveSession(sessionId);
     } catch { /* 忽略 */ }
     sse.disconnect();
     router.replace("/closed");
   }, [sessionId, sse, router]);
+
+  // 消息类型映射 — 避免 render 中重复计算
+  const msgTypes = useMemo(() => {
+    const map = new Map<string, { isMine: boolean; isSystem: boolean }>();
+    for (const msg of chat.messages) {
+      map.set(msg.id, {
+        isMine: msg.sender_anonymous_id === myId,
+        isSystem: msg.type === "system",
+      });
+    }
+    return map;
+  }, [chat.messages, myId]);
 
   if (!session) {
     return (
@@ -154,32 +195,17 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* 消息列表 */}
+      {/* 消息列表 — 每条气泡 memo 化，新消息不触发历史重渲染 */}
       <div style={st.msgList}>
         {chat.messages.map((msg) => {
-          const isMine = msg.sender_anonymous_id === myId;
-          const isSystem = msg.type === "system";
+          const t = msgTypes.get(msg.id);
           return (
-            <div
+            <ChatBubble
               key={msg.id}
-              style={{
-                ...st.msgRow,
-                justifyContent: isSystem ? "center" : isMine ? "flex-end" : "flex-start",
-              }}
-            >
-              <div
-                style={{
-                  ...st.msgBubble,
-                  ...(isSystem
-                    ? st.systemBubble
-                    : isMine
-                    ? st.myBubble
-                    : st.otherBubble),
-                }}
-              >
-                {msg.content}
-              </div>
-            </div>
+              msg={msg}
+              isMine={t?.isMine ?? false}
+              isSystem={t?.isSystem ?? false}
+            />
           );
         })}
         <div ref={bottomRef} />

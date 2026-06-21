@@ -34,6 +34,8 @@ export function useMatch(): UseMatchReturn {
 
   const startMatch = useCallback(
     async (mode: "auto" | "guided" | "free", target?: string) => {
+      // 清理上次请求的 AbortController
+      abortRef.current?.abort();
       setStatus("queuing");
       setError(null);
       abortRef.current = new AbortController();

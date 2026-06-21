@@ -61,8 +61,10 @@ export default function WaitingPage() {
   }, [cancelMatch, router]);
 
   const handleRetry = useCallback(() => {
-    startedRef.current = false;
-  }, []);
+    const mode = sessionStore.getMatchMode() as "auto" | "guided" | "free";
+    const target = sessionStore.getTargetEmotion() || undefined;
+    startMatch(mode, target);
+  }, [startMatch]);
 
   const showRetry = status === "timeout" || status === "no_match" || status === "error";
 

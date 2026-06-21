@@ -1,6 +1,6 @@
 "use client";
 /** 情绪输入页 (/) — 引导式输入 + 氛围背景 */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useEmotionAnalysis } from "@/hooks/useEmotionAnalysis";
 import { sessionStore } from "@/lib/session-store";
@@ -21,32 +21,44 @@ export default function HomePage() {
   const [phIdx, setPhIdx] = useState(0);
   const { analyze, isLoading, error } = useEmotionAnalysis();
   const router = useRouter();
+  const submittingRef = useRef(false);
+  const phTimerRef = useRef<ReturnType<typeof setInterval>>();
 
+  // placeholder 轮换：使用 ref 减少重渲染
   useEffect(() => {
-    const timer = setInterval(() => {
+    phTimerRef.current = setInterval(() => {
       setPhIdx((i) => (i + 1) % PLACEHOLDERS.length);
     }, 3000);
-    return () => clearInterval(timer);
+    return () => clearInterval(phTimerRef.current);
   }, []);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim();
-    if (!trimmed || trimmed.length > MAX_LENGTH) return;
-    const result = await analyze(trimmed);
-    if (!result) return;
-    if (result.redirect === "care") {
-      if (result.analysis) sessionStore.setAnalysis(result.analysis);
-      router.push("/care");
-      return;
-    }
-    if (result.analysis) {
-      sessionStore.setAnalysis(result.analysis);
-      sessionStore.setUserId(sessionStore.getUserId());
-      router.push("/result");
+    if (!trimmed || trimmed.length > MAX_LENGTH || submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      const result = await analyze(trimmed);
+      if (!result) return;
+      if (result.redirect === "care") {
+        if (result.analysis) sessionStore.setAnalysis(result.analysis);
+        router.push("/care");
+        return;
+      }
+      if (result.analysis) {
+        sessionStore.setAnalysis(result.analysis);
+        router.push("/result");
+      }
+    } finally {
+      submittingRef.current = false;
     }
   }, [text, analyze, router]);
 
-  const canSubmit = text.trim().length > 0 && !isLoading;
+  const counterColor = useMemo(
+    () => text.length > MAX_LENGTH * 0.9 ? "#e74c3c" : "#999",
+    [text.length],
+  );
+
+  const canSubmit = text.trim().length > 0 && !isLoading && !submittingRef.current;
 
   return (
     <main style={st.bg}>
@@ -65,12 +77,7 @@ export default function HomePage() {
           autoFocus
         />
         <div style={st.footer}>
-          <span
-            style={{
-              ...st.counter,
-              color: text.length > MAX_LENGTH * 0.9 ? "#e74c3c" : "#999",
-            }}
-          >
+          <span style={{ ...st.counter, color: counterColor }}>
             {text.length}/{MAX_LENGTH}
           </span>
         </div>

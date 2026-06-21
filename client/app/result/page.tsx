@@ -1,6 +1,6 @@
 "use client";
 /** 情绪画像页 (/result) — 情绪卡片 + 匹配模式选择 */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { sessionStore } from "@/lib/session-store";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
@@ -35,14 +35,23 @@ export default function ResultPage() {
     );
   }
 
-  const ec = EMOTION_COLORS[analysis.primary_emotion] ?? DEFAULT_EMOTION_COLOR;
-  const recommendations = analysis.match_preferences.recommended ?? [];
+  const ec = useMemo(
+    () => EMOTION_COLORS[analysis.primary_emotion] ?? DEFAULT_EMOTION_COLOR,
+    [analysis.primary_emotion],
+  );
+  const recommendations = useMemo(
+    () => analysis.match_preferences.recommended ?? [],
+    [analysis.match_preferences.recommended],
+  );
   const isMedium = analysis.safety.risk_level === "MEDIUM";
 
-  const canMatch =
-    (mode === "auto") ||
-    (mode === "guided" && targetEmotion !== "") ||
-    (mode === "free" && targetEmotion.trim() !== "");
+  const canMatch = useMemo(
+    () =>
+      mode === "auto" ||
+      (mode === "guided" && targetEmotion !== "") ||
+      (mode === "free" && targetEmotion.trim() !== ""),
+    [mode, targetEmotion],
+  );
 
   const handleMatch = () => {
     let finalTarget: string | undefined;

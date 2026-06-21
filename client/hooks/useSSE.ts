@@ -7,7 +7,7 @@ import type { SSEStatusEvent } from "@shared/sse-events";
 import type { Message } from "@shared/types";
 
 const MAX_RECONNECT = 3;
-const RECONNECT_DELAY = 2_000;
+const BASE_RECONNECT_DELAY = 1_000;  // 指数退避起点
 const DEAD_TIMEOUT = 10_000;
 
 type SSECallbacks = {
@@ -95,11 +95,12 @@ export function useSSE(): UseSSEReturn {
 
         if (reconnectCountRef.current < MAX_RECONNECT) {
           reconnectCountRef.current++;
+          const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectCountRef.current - 1);
           setTimeout(() => {
             if (!stoppedRef.current) {
               connect(sessionId, callbacksRef.current);
             }
-          }, RECONNECT_DELAY);
+          }, delay);
         } else {
           callbacksRef.current.onError?.("连接已断开，请刷新页面", false);
         }
