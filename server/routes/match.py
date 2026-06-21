@@ -1,4 +1,5 @@
 """POST /api/match · DELETE /api/match"""
+import asyncio
 import time
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
@@ -8,6 +9,8 @@ router = APIRouter()
 COOKIE_NAME = "vibechat_user"
 
 VALID_MODES = {"auto", "guided", "free"}
+POLL_INTERVAL = 1.5      # 轮询间隔（秒）
+MATCH_TIMEOUT = 30        # 最长等待（秒）
 
 
 class MatchRequest(BaseModel):
@@ -29,45 +32,73 @@ async def enter_match(body: MatchRequest, request: Request):
     user_id = request.cookies.get(COOKIE_NAME)
     if not user_id:
         raise HTTPException(401, "请先创建游客身份")
-    user = await request.app.state.user_store.get(user_id)
+    user_store = request.app.state.user_store
+    user = await user_store.get(user_id)
     if not user:
         raise HTTPException(401, "用户不存在，请刷新页面")
 
-    # 2. 校验模式
+    # 2. 校验
     if body.match_mode not in VALID_MODES:
         raise HTTPException(400, f"match_mode 必须为: {', '.join(VALID_MODES)}")
     if not user.get("current_emotion"):
         raise HTTPException(400, "请先完成情绪分析")
-
-    # 3. 状态检查
     if user["match_status"] == "chatting":
         raise HTTPException(400, "你正在聊天中")
 
-    # 4. 进入匹配队列
+    # 3. 进入匹配队列
+    match_queue = request.app.state.match_queue
+    session_store = request.app.state.session_store
+    og = _make_opening_generator(request.app.state.llm_provider)
+
     user["match_mode"] = body.match_mode
     user["target_emotion"] = body.target_emotion
-    await request.app.state.match_queue.enqueue(user)
-    await request.app.state.user_store.save(user)
+    await match_queue.enqueue(user)
+    await user_store.save(user)
 
-    # 5. 尝试匹配
-    result = await match_user(
-        user=user,
-        match_queue=request.app.state.match_queue,
-        session_store=request.app.state.session_store,
-        opening_generator=_make_opening_generator(request.app.state.llm_provider),
-    )
+    # 4. 轮询匹配 — 保持连接直到匹配成功或超时
+    deadline = time.time() + MATCH_TIMEOUT
+    while time.time() < deadline:
+        # 4a. 先检查是否已被对方匹配
+        fresh = await user_store.get(user_id)
+        if fresh and fresh.get("current_session_id"):
+            sid = fresh["current_session_id"]
+            session = await session_store.get(sid)
+            if session:
+                user["match_status"] = "chatting"
+                user["current_session_id"] = sid
+                await user_store.save(user)
+                return {"matched": True, "session": session}
 
-    # 6. 更新匹配后状态
-    if result.get("matched"):
-        user["match_status"] = "chatting"
-        user["current_session_id"] = result["session"]["session_id"]
-        matched_user = await _update_matched_partner(result["session"], user_id, request)
-        # 推送开场白消息
-        opening = result["session"]["opening_message"]
-        await _push_opening_messages(result["session"], opening, request)
+        # 4b. 检查是否已取消
+        if fresh and fresh.get("match_status") == "idle":
+            return {"matched": False, "cancelled": True}
 
-    await request.app.state.user_store.save(user)
-    return result
+        # 4c. 主动匹配
+        result = await match_user(user=user, match_queue=match_queue,
+                                   session_store=session_store, opening_generator=og)
+        if result.get("matched"):
+            user["match_status"] = "chatting"
+            user["current_session_id"] = result["session"]["session_id"]
+            await _update_matched_partner(result["session"], user_id, request)
+            await _push_opening_messages(result["session"],
+                                          result["session"]["opening_message"], request)
+            await user_store.save(user)
+            return result
+
+        # 4d. 未匹配 → 等一会再试
+        await asyncio.sleep(POLL_INTERVAL)
+
+    # 5. 超时
+    user["retry_count"] = user.get("retry_count", 0) + 1
+    await user_store.save(user)
+    return {
+        "matched": False,
+        "fallback": {
+            "type": "timeout",
+            "retry_count": user["retry_count"],
+            "options": ["retry", "random_match", "leave"],
+        }
+    }
 
 
 async def _update_matched_partner(session: dict, my_id: str, request: Request) -> dict | None:

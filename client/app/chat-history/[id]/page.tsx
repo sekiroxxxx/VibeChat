@@ -55,6 +55,7 @@ export default function ChatHistoryPage() {
       dateLabel: string | null;
       isMine: boolean;
       isSystem: boolean;
+      senderName: string;
     }> = [];
     let prevDay = "";
 
@@ -66,11 +67,14 @@ export default function ChatHistoryPage() {
         dateLabel: day !== prevDay ? day : null,
         isMine: msg.sender_anonymous_id === myId,
         isSystem: msg.type === "system",
+        senderName: msg.sender_anonymous_id === myId
+          ? (session.user_a.id === myId ? session.user_a.anonymous_name : session.user_b.anonymous_name)
+          : otherName,
       });
       prevDay = day;
     }
     return result;
-  }, [session, myId]);
+  }, [session, myId, otherName]);
 
   if (isLoading) {
     return (
@@ -122,6 +126,7 @@ export default function ChatHistoryPage() {
               time={m.time}
               isMine={m.isMine}
               isSystem={m.isSystem}
+              senderName={m.senderName}
             />
           </React.Fragment>
         ))}

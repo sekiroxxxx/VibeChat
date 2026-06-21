@@ -72,6 +72,10 @@ async def match_user(user: dict, match_queue, session_store, opening_generator):
     top = sorted(candidates, key=lambda x: x[1], reverse=True)[:TOP_N_RANDOM]
     matched_user, score, near_identical = random.choice(top)
 
+    # ★ 关键：先出队再调 LLM — 防止对方的轮询在 LLM 调用期间重复匹配
+    await match_queue.dequeue(user["user_id"])
+    await match_queue.dequeue(matched_user["user_id"])
+
     # 创建会话
     session = {
         "session_id": _uuid(),
@@ -87,8 +91,6 @@ async def match_user(user: dict, match_queue, session_store, opening_generator):
         "risk_flags": ["near_identical_match"] if near_identical else [],
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    await match_queue.dequeue(user["user_id"])
-    await match_queue.dequeue(matched_user["user_id"])
     await session_store.save(session)
     return {"matched": True, "session": session}
 
