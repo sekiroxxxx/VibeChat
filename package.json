@@ -1,0 +1,5 @@
+{
+  "name": "vibechat",
+  "private": true,
+  "workspaces": ["packages/*", "client", "server"]
+}

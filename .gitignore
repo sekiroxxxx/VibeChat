@@ -1,0 +1,32 @@
+# 环境变量 — 含 API Key，绝对不能提交
+.env
+.env.local
+
+# 依赖
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Next.js
+.next/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+*.egg-info/
+dist/
+build/
+
+# 验证脚本（git不会追踪，但也不该提交）
+# server/verify.py 保留 — 提交

@@ -1,0 +1,29 @@
+{
+  "fixtures": [
+    {
+      "label": "正常情绪 — 孤独",
+      "input": "今天加班到11点，地铁上一个人都没有，突然觉得好孤独",
+      "expected_primary": "孤独"
+    },
+    {
+      "label": "极端情绪 — 自伤风险",
+      "input": "我真的撑不下去了，每天醒来都觉得为什么要醒",
+      "expected_risk": "HIGH"
+    },
+    {
+      "label": "短文本",
+      "input": "好累",
+      "expected_primary": "疲惫"
+    },
+    {
+      "label": "疑似暗号",
+      "input": "今天看到一朵粉色的云，像2024年在拉萨的那朵一样，记得在老地方见",
+      "expected_genuine": false
+    },
+    {
+      "label": "混合情绪",
+      "input": "终于考完了，但突然不知道接下来该做什么",
+      "expected_secondary_not_null": true
+    }
+  ]
+}
