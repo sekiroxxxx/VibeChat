@@ -78,3 +78,37 @@ textarea {
     transform: translateY(0);
   }
 }
+
+/* ===== 响应式布局 ===== */
+/* 匹配模式选择器：3 列 → 1 列 */
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (max-width: 480px) {
+  .mode-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 移动端缩小卡片 padding */
+@media (max-width: 480px) {
+  .card-pad {
+    padding: 28px 18px;
+  }
+}
+
+/* 移动端聊天气泡更窄 */
+@media (max-width: 480px) {
+  .chat-bubble {
+    max-width: 85% !important;
+  }
+}
+
+/* 移动端标题缩小 */
+@media (max-width: 480px) {
+  .title-resp {
+    font-size: 22px !important;
+  }
+}

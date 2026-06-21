@@ -4,6 +4,9 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useChat } from "@/hooks/useChat";
 import { useSSE } from "@/hooks/useSSE";
+import { sessionStore } from "@/lib/session-store";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
 import type { ChatSession, Message } from "@shared/types";
 
@@ -28,14 +31,12 @@ export default function ChatPage() {
 
   // 初始化：加载 session 数据
   useEffect(() => {
-    const raw = sessionStorage.getItem("vb_session");
-    if (!raw) return;
-    const sess: ChatSession = JSON.parse(raw);
-    if (sess.session_id !== sessionId) return;
+    const sess = sessionStore.getSession();
+    if (!sess || sess.session_id !== sessionId) return;
     setSession(sess);
 
     // 判断我是 user_a 还是 user_b
-    const storedUserId = sessionStorage.getItem("vb_user_id") || "";
+    const storedUserId = sessionStore.getUserId();
     const isA = sess.user_a.id === storedUserId;
     const me = isA ? sess.user_a : sess.user_b;
     const other = isA ? sess.user_b : sess.user_a;
@@ -112,8 +113,13 @@ export default function ChatPage() {
 
   if (!session) {
     return (
-      <main style={st.loadBg}>
-        <p style={st.loadText}>加载中…</p>
+      <main style={st.centerBg}>
+        <EmptyState
+          icon="💬"
+          title="无法加载会话"
+          description="会话可能已过期"
+          action={{ label: "返回首页", onClick: () => router.push("/") }}
+        />
       </main>
     );
   }
@@ -215,13 +221,13 @@ const st: Record<string, React.CSSProperties> = {
     height: "100vh",
     background: "#f5f5f7",
   },
-  loadBg: {
+  centerBg: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     height: "100vh",
+    padding: "20px",
   },
-  loadText: { color: "#999", fontSize: "15px" },
   header: {
     display: "flex",
     alignItems: "center",

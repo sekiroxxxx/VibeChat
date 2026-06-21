@@ -1,9 +1,20 @@
 "use client";
 /** 会话结束页 (/closed) */
 import { useRouter } from "next/navigation";
+import { sessionStore } from "@/lib/session-store";
 
 export default function ClosedPage() {
   const router = useRouter();
+
+  const handleRematch = () => {
+    sessionStore.clear();
+    router.push("/result");
+  };
+
+  const handleHome = () => {
+    sessionStore.clear();
+    router.push("/");
+  };
 
   return (
     <main style={st.bg}>
@@ -17,10 +28,10 @@ export default function ClosedPage() {
         </p>
 
         <div style={st.actions}>
-          <button style={st.primaryBtn} onClick={() => router.push("/result")}>
+          <button style={st.primaryBtn} onClick={handleRematch}>
             重新匹配
           </button>
-          <button style={st.secondaryBtn} onClick={() => router.push("/")}>
+          <button style={st.secondaryBtn} onClick={handleHome}>
             返回首页
           </button>
         </div>

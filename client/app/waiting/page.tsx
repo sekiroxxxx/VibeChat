@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useMatch } from "@/hooks/useMatch";
+import { sessionStore } from "@/lib/session-store";
 import type { MatchStatus } from "@/hooks/useMatch";
 
 const WAITING_MESSAGES = [
@@ -41,18 +42,15 @@ export default function WaitingPage() {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    const mode = (sessionStorage.getItem("vb_match_mode") || "auto") as
-      | "auto"
-      | "guided"
-      | "free";
-    const target = sessionStorage.getItem("vb_target_emotion") || undefined;
+    const mode = sessionStore.getMatchMode() as "auto" | "guided" | "free";
+    const target = sessionStore.getTargetEmotion() || undefined;
     startMatch(mode, target);
   }, [startMatch]);
 
   // 匹配成功 → 跳转聊天
   useEffect(() => {
     if (status === "matched" && session) {
-      sessionStorage.setItem("vb_session", JSON.stringify(session));
+      sessionStore.setSession(session);
       router.replace(`/chat/${session.session_id}`);
     }
   }, [status, session, router]);

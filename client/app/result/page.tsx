@@ -2,7 +2,9 @@
 /** 情绪画像页 (/result) — 情绪卡片 + 匹配模式选择 */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { sessionStore } from "@/lib/session-store";
 import { EMOTION_COLORS, DEFAULT_EMOTION_COLOR } from "@/constants/emotion-colors";
+import { EmptyState } from "@/components/shared/EmptyState";
 import type { EmotionAnalysis } from "@shared/types";
 
 type MatchMode = "auto" | "guided" | "free";
@@ -20,15 +22,18 @@ export default function ResultPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("vb_analysis");
-    if (!raw) {
-      router.replace("/");
-      return;
-    }
-    setAnalysis(JSON.parse(raw));
+    const a = sessionStore.getAnalysis();
+    if (!a) { router.replace("/"); return; }
+    setAnalysis(a);
   }, [router]);
 
-  if (!analysis) return null;
+  if (!analysis) {
+    return (
+      <main style={st.bg}>
+        <EmptyState icon="🔍" title="没有分析结果" description="请先输入你的感受" action={{ label: "返回首页", onClick: () => router.push("/") }} />
+      </main>
+    );
+  }
 
   const ec = EMOTION_COLORS[analysis.primary_emotion] ?? DEFAULT_EMOTION_COLOR;
   const recommendations = analysis.match_preferences.recommended ?? [];
@@ -46,8 +51,8 @@ export default function ResultPage() {
     } else if (mode === "guided" || mode === "free") {
       finalTarget = targetEmotion;
     }
-    sessionStorage.setItem("vb_match_mode", mode);
-    if (finalTarget) sessionStorage.setItem("vb_target_emotion", finalTarget);
+    sessionStore.setMatchMode(mode);
+    if (finalTarget) sessionStore.setTargetEmotion(finalTarget);
     router.push("/waiting");
   };
 
@@ -100,7 +105,7 @@ export default function ResultPage() {
         {/* 匹配模式选择 */}
         <div>
           <h2 style={st.sectionTitle}>选择匹配方式</h2>
-          <div style={st.modeGrid}>
+          <div className="mode-grid" style={st.modeGrid}>
             {(Object.keys(MODE_META) as MatchMode[]).map((m) => (
               <button
                 key={m}
@@ -229,11 +234,7 @@ const st: Record<string, React.CSSProperties> = {
     textAlign: "center",
   },
   sectionTitle: { fontSize: "16px", fontWeight: 600, color: "#333", marginBottom: "10px" },
-  modeGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "10px",
-  },
+  modeGrid: {},
   modeCard: {
     display: "flex",
     flexDirection: "column",

@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useEmotionAnalysis } from "@/hooks/useEmotionAnalysis";
+import { sessionStore } from "@/lib/session-store";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { ErrorBanner } from "@/components/shared/ErrorBanner";
 
 const PLACEHOLDERS = [
   "今天发生了什么让你开心的事？",
@@ -31,7 +34,7 @@ export default function HomePage() {
     if (!trimmed || trimmed.length > MAX_LENGTH) return;
     const result = await analyze(trimmed);
     if (!result) return;
-    sessionStorage.setItem("vb_analysis", JSON.stringify(result));
+    sessionStore.setAnalysis(result);
     if (result.safety.risk_level === "HIGH") {
       router.push("/care");
     } else {
@@ -68,14 +71,16 @@ export default function HomePage() {
           </span>
         </div>
 
-        {error && <p style={st.error}>{error}</p>}
+        {isLoading && <LoadingSpinner text="正在感受你的情绪…" />}
+
+        {error && <ErrorBanner message={error} onRetry={() => handleSubmit()} />}
 
         <button
           style={{ ...st.submitBtn, opacity: canSubmit ? 1 : 0.5 }}
           disabled={!canSubmit}
           onClick={handleSubmit}
         >
-          {isLoading ? "分析中…" : "开始分析"}
+          开始分析
         </button>
       </div>
     </main>

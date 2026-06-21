@@ -2,6 +2,7 @@
 /** 关怀页 (/care) — 极端情绪阻断 + 求助资源 */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { sessionStore } from "@/lib/session-store";
 import type { EmotionAnalysis } from "@shared/types";
 
 const DEFAULT_RESOURCES = [
@@ -15,8 +16,8 @@ export default function CarePage() {
   const router = useRouter();
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("vb_analysis");
-    if (raw) setAnalysis(JSON.parse(raw));
+    const a = sessionStore.getAnalysis();
+    if (a) setAnalysis(a);
   }, []);
 
   const resources = analysis?.safety?.resources?.length
