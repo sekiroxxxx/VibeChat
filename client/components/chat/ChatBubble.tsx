@@ -79,26 +79,26 @@ const st: Record<string, React.CSSProperties> = {
     wordBreak: "break-word",
   },
   systemBubble: {
-    background: "#f0eeff",
-    color: "#7c6ff7",
+    background: "var(--tag-bg)",
+    color: "var(--accent)",
     fontSize: "13px",
     maxWidth: "85%",
     textAlign: "center",
   },
   myBubble: {
-    background: "#7c6ff7",
-    color: "#fff",
+    background: "var(--accent)",
+    color: "var(--btn-text)",
     borderBottomRightRadius: "4px",
   },
   otherBubble: {
-    background: "#fff",
-    color: "#333",
+    background: "var(--surface)",
+    color: "var(--text)",
     borderBottomLeftRadius: "4px",
     boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
   },
   msgTime: {
     fontSize: "11px",
-    color: "#bbb",
+    color: "var(--text3)",
     marginTop: "3px",
     padding: "0 4px",
   },
@@ -111,11 +111,11 @@ const st: Record<string, React.CSSProperties> = {
   dateSepLine: {
     flex: 1,
     height: "1px",
-    background: "#e8e8e8",
+    background: "var(--border)",
   },
   dateSepText: {
     fontSize: "12px",
-    color: "#bbb",
+    color: "var(--text3)",
     whiteSpace: "nowrap",
   },
 };

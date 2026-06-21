@@ -17,8 +17,8 @@ export function LoadingSpinner({ text, size = "md", className = "" }: LoadingSpi
         style={{
           width: dim,
           height: dim,
-          border: `${borderW}px solid #e0e0e0`,
-          borderTopColor: "#7c6ff7",
+          border: `${borderW}px solid var(--border)`,
+          borderTopColor: "var(--accent)",
           borderRadius: "50%",
           animation: "spin 0.7s linear infinite",
         }}
@@ -36,5 +36,5 @@ const st: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     padding: "32px",
   },
-  text: { fontSize: "14px", color: "#999" },
+  text: { fontSize: "14px", color: "var(--text3)" },
 };

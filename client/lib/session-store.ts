@@ -3,6 +3,7 @@ import type { EmotionAnalysis, ChatSession } from "@shared/types";
 
 const KEYS = {
   ANALYSIS: "vb_analysis",
+  ANON_IDENTITY: "vb_anon_identity",
   MATCH_MODE: "vb_match_mode",
   TARGET_EMOTION: "vb_target_emotion",
   SESSION: "vb_session",
@@ -19,6 +20,14 @@ export const sessionStore = {
   },
   setAnalysis(analysis: EmotionAnalysis): void {
     sessionStorage.setItem(KEYS.ANALYSIS, JSON.stringify(analysis));
+  },
+
+  /* 匿名身份 */
+  getAnonymousIdentity(): string {
+    return sessionStorage.getItem(KEYS.ANON_IDENTITY) || "";
+  },
+  setAnonymousIdentity(id: string): void {
+    sessionStorage.setItem(KEYS.ANON_IDENTITY, id);
   },
 
   /* 匹配参数 */

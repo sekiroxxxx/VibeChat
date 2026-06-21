@@ -37,7 +37,7 @@ const st: Record<string, React.CSSProperties> = {
     padding: "6px 14px",
     borderRadius: "6px",
     background: "#c0392b",
-    color: "#fff",
+    color: "var(--btn-text)",
     fontSize: "12px",
     fontWeight: 600,
     flexShrink: 0,

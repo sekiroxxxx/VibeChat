@@ -1,16 +1,25 @@
 "use client";
-/** 匹配等待页 (/waiting) — 等待动画 + 动态文案 */
+/** 匹配等待页 (/waiting) — 浮动气泡 + 中心 orb + flash 消息 + 状态文案 */
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useMatch } from "@/hooks/useMatch";
+import { useTheme } from "@/hooks/useTheme";
 import { sessionStore } from "@/lib/session-store";
+import { EMOTION_COLORS } from "@/constants/emotion-colors";
 import type { MatchStatus } from "@/hooks/useMatch";
 
-const WAITING_MESSAGES = [
+/* ═══════ 常量 ═══════ */
+const STATUS_MESSAGES_DAY = [
   "正在寻找和你情绪相近的人…",
-  "每个人都有自己的故事…",
-  "很快就会有答案了…",
-  "正在匹配最合适的对话伙伴…",
+  "还有人也在午后写下类似的感受",
+  "快了——正在匹配最合适的对话",
+  "每个人都有想被理解的时刻",
+];
+const STATUS_MESSAGES_NIGHT = [
+  "正在寻找和你情绪相近的人…",
+  "还有人也在深夜写下类似的感受",
+  "快了——正在匹配最合适的对话",
+  "每个人都有想被理解的时刻",
 ];
 
 const STATUS_TEXT: Record<MatchStatus, string> = {
@@ -22,32 +31,56 @@ const STATUS_TEXT: Record<MatchStatus, string> = {
   error: "匹配服务暂时不可用",
 };
 
+const FLASHES = [
+  "有人刚刚找到了能懂自己的人 ✨",
+  "又有两个人因为相似的感受相遇了",
+  "一个气泡消失了——他们匹配成功了",
+];
+
+/* bubble 池 — 从情绪常量提取 */
+const BUBBLE_POOL = Object.entries(EMOTION_COLORS).map(([emotion, c]) => ({
+  emoji: c.emoji,
+  label: emotion,
+}));
+
+interface BubbleData {
+  id: number;
+  emoji: string;
+  label: string;
+  left: string;
+  top: string;
+  life: number;
+  dx: string;
+  dy: string;
+}
+
+/* ═══════ 组件 ═══════ */
 export default function WaitingPage() {
   const router = useRouter();
-  const { status, session, queuePosition, error, startMatch, cancelMatch } =
-    useMatch();
-  const [msgIdx, setMsgIdx] = useState(0);
+  const { theme, toggle: toggleTheme } = useTheme();
+  const { status, session, queuePosition, error, startMatch, cancelMatch } = useMatch();
+  const [statusIdx, setStatusIdx] = useState(0);
+  const [bubbles, setBubbles] = useState<BubbleData[]>([]);
+  const [flash, setFlash] = useState<{ text: string; visible: boolean }>({ text: "", visible: false });
   const startedRef = useRef(false);
+  const bubbleIdRef = useRef(0);
+  const bubbleTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const bubbleIntervalRef = useRef<ReturnType<typeof setInterval>>();
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // 轮换等待文案
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setMsgIdx((i) => (i + 1) % WAITING_MESSAGES.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
+  const isQueuing = status === "queuing" || status === "idle";
+  const showRetry = status === "timeout" || status === "no_match" || status === "error";
 
-  // 发起匹配
+  /* ── 发起匹配 ── */
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-
     const mode = sessionStore.getMatchMode() as "auto" | "guided" | "free";
     const target = sessionStore.getTargetEmotion() || undefined;
     startMatch(mode, target);
   }, [startMatch]);
 
-  // 匹配成功 → 跳转聊天
+  /* ── 匹配成功 → 跳转 ── */
   useEffect(() => {
     if (status === "matched" && session) {
       sessionStore.setSession(session);
@@ -55,6 +88,68 @@ export default function WaitingPage() {
     }
   }, [status, session, router]);
 
+  /* ── 状态文案轮换 ── */
+  useEffect(() => {
+    const msgs = theme === "day" ? STATUS_MESSAGES_DAY : STATUS_MESSAGES_NIGHT;
+    const timer = setInterval(() => {
+      setStatusIdx((i) => (i + 1) % msgs.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [theme]);
+
+  /* ── 气泡系统 ── */
+  const spawnBubble = useCallback(() => {
+    const b = BUBBLE_POOL[Math.floor(Math.random() * BUBBLE_POOL.length)];
+    const id = ++bubbleIdRef.current;
+    const life = 12 + Math.random() * 10;
+    const bubble: BubbleData = {
+      id,
+      emoji: b.emoji,
+      label: b.label,
+      left: `${5 + Math.random() * 78}%`,
+      top: `${10 + Math.random() * 70}%`,
+      life,
+      dx: `${(Math.random() - 0.5) * 20}px`,
+      dy: `${(Math.random() - 0.5) * 16}px`,
+    };
+    setBubbles((prev) => {
+      const next = [...prev, bubble];
+      return next.length > 28 ? next.slice(-24) : next;
+    });
+    const removeTimer = setTimeout(() => {
+      setBubbles((prev) => prev.filter((x) => x.id !== id));
+    }, life * 1000 + 300);
+    bubbleTimersRef.current.push(removeTimer);
+  }, []);
+
+  useEffect(() => {
+    // 初始爆发 12 个
+    for (let i = 0; i < 12; i++) {
+      setTimeout(spawnBubble, i * 280);
+    }
+    // 持续生成
+    bubbleIntervalRef.current = setInterval(spawnBubble, 2000 + Math.random() * 2000);
+    return () => {
+      clearInterval(bubbleIntervalRef.current);
+      bubbleTimersRef.current.forEach(clearTimeout);
+    };
+  }, [spawnBubble]);
+
+  /* ── Flash 消息 ── */
+  useEffect(() => {
+    const schedule = () => {
+      flashTimerRef.current = setTimeout(() => {
+        const msg = FLASHES[Math.floor(Math.random() * FLASHES.length)];
+        setFlash({ text: msg, visible: true });
+        setTimeout(() => setFlash((f) => ({ ...f, visible: false })), 2200);
+        schedule();
+      }, 7000 + Math.random() * 9000);
+    };
+    flashTimerRef.current = setTimeout(schedule, 5000);
+    return () => clearTimeout(flashTimerRef.current);
+  }, []);
+
+  /* ── 取消 / 重试 ── */
   const handleCancel = useCallback(async () => {
     await cancelMatch();
     router.push("/result");
@@ -66,127 +161,108 @@ export default function WaitingPage() {
     startMatch(mode, target);
   }, [startMatch]);
 
-  const showRetry = status === "timeout" || status === "no_match" || status === "error";
+  const statusMsgs = theme === "day" ? STATUS_MESSAGES_DAY : STATUS_MESSAGES_NIGHT;
 
   return (
-    <main style={st.bg}>
-      <div style={st.card}>
-        {status === "queuing" || status === "idle" ? (
-          <>
-            <div style={st.animation}>
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  style={{
-                    ...st.dot,
-                    animationDelay: `${i * 0.3}s`,
-                  }}
-                />
-              ))}
-            </div>
-            <p style={st.message}>{WAITING_MESSAGES[msgIdx]}</p>
-            {queuePosition !== null && (
-              <p style={st.queuePos}>队列位置：第 {queuePosition + 1} 位</p>
-            )}
-            <button style={st.cancelBtn} onClick={handleCancel}>
-              取消匹配
+    <>
+      {/* 导航 */}
+      <nav className="nav">
+        <span className="logo">VibeChat</span>
+        <div className="nav-r">
+          {isQueuing ? (
+            <button
+              className="back-link"
+              onClick={handleCancel}
+              style={{ fontSize: "0.84rem", color: "var(--text3)", background: "none" }}
+            >
+              ← 返回
             </button>
-          </>
-        ) : showRetry ? (
-          <>
-            <span style={st.statusEmoji}>
-              {status === "timeout" ? "⏳" : status === "error" ? "⚠️" : "🔍"}
-            </span>
-            <p style={st.statusText}>{STATUS_TEXT[status]}</p>
-            {error && <p style={st.errorText}>{error}</p>}
-            <div style={st.actionRow}>
-              <button style={st.retryBtn} onClick={handleRetry}>
-                重试匹配
-              </button>
-              <button style={st.backBtn} onClick={() => router.push("/result")}>
-                返回修改
-              </button>
+          ) : (
+            <a href="/result" style={{ fontSize: "0.84rem", color: "var(--text3)", textDecoration: "none" }}>
+              ← 返回
+            </a>
+          )}
+          <button className="tgl" onClick={toggleTheme}>
+            <span>{theme === "day" ? "☀️" : "🌙"}</span>
+            <span>{theme === "day" ? "白天" : "黑夜"}</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* 全屏等待区 */}
+      <div className="waiting">
+        {/* 浮动气泡层 */}
+        <div className="bubbles">
+          {bubbles.map((b) => (
+            <div
+              key={b.id}
+              className="bubble"
+              style={{
+                left: b.left,
+                top: b.top,
+                "--life": `${b.life}s`,
+                "--dx": b.dx,
+                "--dy": b.dy,
+                background: "var(--accent-s)",
+              } as React.CSSProperties}
+            >
+              <span className="be">{b.emoji}</span>
+              {b.label}
             </div>
-          </>
-        ) : null}
+          ))}
+        </div>
+
+        {/* Flash 消息 */}
+        <div
+          className="flash"
+          style={{
+            opacity: flash.visible ? 1 : 0,
+            transform: flash.visible ? "translate(-50%, -50%) translateY(0)" : "translate(-50%, -50%) translateY(-12px)",
+          }}
+        >
+          {flash.text}
+        </div>
+
+        {/* 中心内容 */}
+        <div className="center">
+          {isQueuing ? (
+            <>
+              {/* Orb */}
+              <div className="orb">
+                <div className="glow" />
+                <div className="core">💭</div>
+                <div className="ring" />
+              </div>
+
+              <p className="status">{statusMsgs[statusIdx]}</p>
+
+              {queuePosition !== null && (
+                <p className="queue">队列位置：第 {queuePosition + 1} 位</p>
+              )}
+
+              <button className="btn-cancel" onClick={handleCancel}>
+                取消等待
+              </button>
+            </>
+          ) : showRetry ? (
+            <>
+              <span className="status-emoji">
+                {status === "timeout" ? "⏳" : status === "error" ? "⚠️" : "🔍"}
+              </span>
+              <p className="status-text">{STATUS_TEXT[status]}</p>
+              {error && <p className="error-text">{error}</p>}
+              <div className="action-row">
+                <button className="btn-retry" onClick={handleRetry}>
+                  重试匹配
+                </button>
+                <button className="btn-back" onClick={() => router.push("/result")}>
+                  返回修改
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
-    </main>
+    </>
   );
 }
-
-const st: Record<string, React.CSSProperties> = {
-  bg: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)",
-    padding: "20px",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "440px",
-    background: "rgba(255,255,255,0.06)",
-    backdropFilter: "blur(16px)",
-    borderRadius: "24px",
-    padding: "48px 32px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "24px",
-    textAlign: "center",
-  },
-  animation: {
-    display: "flex",
-    gap: "10px",
-    justifyContent: "center",
-  },
-  dot: {
-    width: "12px",
-    height: "12px",
-    borderRadius: "50%",
-    background: "#7c6ff7",
-    animation: "pulse 1.4s ease-in-out infinite",
-  },
-  message: {
-    fontSize: "16px",
-    color: "#ccd",
-    lineHeight: 1.6,
-  },
-  queuePos: {
-    fontSize: "14px",
-    color: "rgba(255,255,255,0.4)",
-  },
-  cancelBtn: {
-    padding: "10px 28px",
-    borderRadius: "10px",
-    background: "rgba(255,255,255,0.1)",
-    color: "rgba(255,255,255,0.7)",
-    fontSize: "14px",
-  },
-  statusEmoji: { fontSize: "48px" },
-  statusText: { fontSize: "16px", color: "#ccd", lineHeight: 1.6 },
-  errorText: {
-    fontSize: "13px",
-    color: "rgba(255,140,140,0.8)",
-    background: "rgba(255,0,0,0.1)",
-    padding: "8px 14px",
-    borderRadius: "8px",
-  },
-  actionRow: { display: "flex", gap: "12px" },
-  retryBtn: {
-    padding: "12px 28px",
-    borderRadius: "10px",
-    background: "#7c6ff7",
-    color: "#fff",
-    fontSize: "15px",
-    fontWeight: 600,
-  },
-  backBtn: {
-    padding: "12px 28px",
-    borderRadius: "10px",
-    background: "rgba(255,255,255,0.1)",
-    color: "rgba(255,255,255,0.7)",
-    fontSize: "15px",
-  },
-};
